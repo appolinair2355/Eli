@@ -7,19 +7,22 @@
   <style>
     body{
       font-family:Arial,Helvetica,sans-serif;
-      max-width:800px;
+      max-width:900px;
       margin:0 auto;
       padding:20px;
-      background:#f5f5f5
+      background:#1e1e1e; /* fond sombre */
+      color:#fff; /* texte blanc */
     }
     textarea{
       width:100%;
       height:200px;
       padding:10px;
-      border:1px solid #ddd;
+      border:1px solid #444;
       border-radius:5px;
       font-family:monospace;
-      resize:vertical
+      resize:vertical;
+      background:#2a2a2a;
+      color:#fff;
     }
     button{
       background:#007bff;
@@ -35,15 +38,16 @@
     #result{
       margin-top:20px;
       padding:15px;
-      background:#ffffff; /* fond blanc */
+      background:#2a2a2a;
       border-radius:5px;
       white-space:pre-wrap;
       font-family:monospace;
-      min-height:50px
+      min-height:50px;
+      color:#fff;
     }
-    .loader{color:#007bff;font-weight:bold}
-    .success{background:#ffffff;color:inherit} /* fond blanc et vraies couleurs */
-    .error{color:red;background:#ffe6e6}
+    .loader{color:#ff9800;font-weight:bold}
+    .success{color:#fff}
+    .error{color:red;background:#400}
   </style>
 </head>
 <body>
@@ -66,87 +70,98 @@
       resultDiv.className = 'loader';
       resultDiv.textContent = 'Analyse en cours par Kouamé IA…';
 
-      // Question ultra-précise
+      // Question précise et structurée
       const question = `Analyse ces mains. 
 
 Règles à suivre :
-1. Supprime tous les tags (#T, ✅, 🔵#R, - etc.).  
-2. Ne garde que la première parenthèse de chaque ligne (ignore la deuxième s’il y en a).  
-3. Considère chaque carte comme une **valeur + une couleur collées** (exemples : A♦, 7♠, Q♥, 10♣).  
-   👉 Ce sont ces entités entières qu’il faut traiter et classer.  
-4. Classe toutes les cartes selon cet ordre strict (ordre numérique 1 → 36) :  
+1. Supprime tous les tags (#T, ✅, 🔵#R, - etc.)
+2. Ne garde que la première parenthèse de chaque ligne (ignore la deuxième s’il y en a)
+3. Chaque carte doit être traitée comme un bloc valeur+symbole collés (ex: A♠, 10♦, Q♥)
+4. Classe et regroupe les cartes extraites selon cet ordre strict :
+A♠,K♠,Q♠,J♠,10♠,9♠,8♠,7♠,6♠,
+A♦,K♦,Q♦,J♦,10♦,9♦,8♦,7♦,6♦,
+A♣,K♣,Q♣,J♣,10♣,9♣,8♣,7♣,6♣,
+A♥,K♥,Q♥,J♥,10♥,9♥,8♥,7♥,6♥
 
-1=A♠, 2=K♠, 3=Q♠, 4=J♠, 5=10♠, 6=9♠, 7=8♠, 8=7♠, 9=6♠  
-10=A♦, 11=K♦, 12=Q♦, 13=J♦, 14=10♦, 15=9♦, 16=8♦, 17=7♦, 18=6♦  
-19=A♣, 20=K♣, 21=Q♣, 22=J♣, 23=10♣, 24=9♣, 25=8♣, 26=7♣, 27=6♣  
-28=A♥, 29=K♥, 30=Q♥, 31=J♥, 32=10♥, 33=9♥, 34=8♥, 35=7♥, 36=6♥  
+⚠️ Réponds toujours avec ce format final clair :
 
-👉 Affiche les cartes triées dans cet ordre exact avec leur ligne nettoyée (#N…(...)).  
+### Liste finale triée
+
+♠️ Pique :
+- A♠ → (lignes concernées)
+- K♠ → ...
+- Q♠ → ...
+- J♠ → ...
+- 10♠ → ...
+- 9♠ → ...
+- 8♠ → ...
+- 7♠ → ...
+- 6♠ → ...
+
+♦️ Carreau :
+- A♦ → ...
+- K♦ → ...
+...
+
+♣️ Trèfle :
+- A♣ → ...
+...
+
+♥️ Cœur :
+- A♥ → ...
+...
 
 ---
 
-### Exemple complet : 
+### Exemple clair : 
 
-Données brutes :  
+Données brutes :
 #N1196. ✅8(A♦7♠) - 2(5♦7♣) #T10  
 #N1197. ✅9(A♦8♠) - 5(3♣K♥) #T12  
 #N1198. ✅7(7♣J♥) - 6(3♣3♦) #T13  
 #N1199. ✅8(A♠9♦8♦) - 4(3♥A♦) #T12  
 #N1200. 0(10♣Q♣Q♥) - ✅7(2♣A♥4♠)
 
-Étape 1 : suppression des tags et de la 2ᵉ parenthèse →  
+Étape 1 : nettoyage →  
 #N1196.8(A♦7♠)  
 #N1197.9(A♦8♠)  
 #N1198.7(7♣J♥)  
 #N1199.8(A♠9♦8♦)  
 #N1200.0(10♣Q♣Q♥)
 
-Étape 2 : extraction des cartes entières (valeur+couleur collées) →  
+Étape 2 : extraction →  
 - Ligne 1196 → A♦, 7♠  
 - Ligne 1197 → A♦, 8♠  
 - Ligne 1198 → 7♣, J♥  
 - Ligne 1199 → A♠, 9♦, 8♦  
 - Ligne 1200 → 10♣, Q♣, Q♥  
 
-Étape 3 : classement numérique (1–36) →  
+Étape 3 : format final trié →  
 
-1. A♠  
-   #N1199.8(A♠9♦8♦)  
+### Liste finale triée
 
-8. 7♠  
-   #N1196.8(A♦7♠)  
+♠️ Pique :
+- A♠ → #N1199.8(A♠9♦8♦)
+- 8♠ → #N1197.9(A♦8♠)
+- 7♠ → #N1196.8(A♦7♠)
 
-7. 8♠  
-   #N1197.9(A♦8♠)  
+♦️ Carreau :
+- A♦ → #N1196.8(A♦7♠), #N1197.9(A♦8♠)
+- 9♦ → #N1199.8(A♠9♦8♦)
+- 8♦ → #N1199.8(A♠9♦8♦)
 
-10. A♦  
-    #N1196.8(A♦7♠)  
-    #N1197.9(A♦8♠)  
+♣️ Trèfle :
+- Q♣ → #N1200.0(10♣Q♣Q♥)
+- 10♣ → #N1200.0(10♣Q♣Q♥)
+- 7♣ → #N1198.7(7♣J♥)
 
-15. 9♦  
-    #N1199.8(A♠9♦8♦)  
-
-16. 8♦  
-    #N1199.8(A♠9♦8♦)  
-
-21. Q♣  
-    #N1200.0(10♣Q♣Q♥)  
-
-23. 10♣  
-    #N1200.0(10♣Q♣Q♥)  
-
-26. 7♣  
-    #N1198.7(7♣J♥)  
-
-30. Q♥  
-    #N1200.0(10♣Q♣Q♥)  
-
-31. J♥  
-    #N1198.7(7♣J♥)  
+♥️ Cœur :
+- Q♥ → #N1200.0(10♣Q♣Q♥)
+- J♥ → #N1198.7(7♣J♥)
 
 ---
 
-Maintenant applique exactement la même logique sur mes données ci-dessous :`;
+Maintenant applique cette même logique sur mes données ci-dessous :`;
 
       try {
         const res = await fetch('/ask', {
@@ -155,7 +170,6 @@ Maintenant applique exactement la même logique sur mes données ci-dessous :`;
           body: JSON.stringify({ data: input, question })
         });
 
-        // lecture en flux (stream OpenAI)
         const reader = res.body.getReader();
         const decoder = new TextDecoder("utf-8");
         resultDiv.className = 'success';
