@@ -1,24 +1,29 @@
 // server.js
 import express from "express";
+import bodyParser from "body-parser";
 import dotenv from "dotenv";
-import { OpenAI } from "openai";
+import OpenAI from "openai";
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 10000; // ✅ forcé sur 10000
 
+app.use(bodyParser.json());
+app.use(express.static("public"));
+
+// Config OpenAI
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-app.use(express.json());
-app.use(express.static("public"));
-
-/* ---------- route IA OpenAI ---------- */
+// Route API /ask
 app.post("/ask", async (req, res) => {
   const { data, question } = req.body;
-  if (!question) return res.status(400).json({ error: "Question manquante" });
+
+  if (!data || !question) {
+    return res.status(400).json({ success: false, error: "Données ou question manquantes." });
+  }
 
   try {
     const completion = await openai.chat.completions.create({
@@ -26,24 +31,25 @@ app.post("/ask", async (req, res) => {
       messages: [
         {
           role: "system",
-          content: "Tu es un assistant spécialisé dans l’analyse de mains de cartes. Réponds en français."
+          content:
+            "Tu es un assistant spécialisé dans l’analyse et le classement des cartes. Réponds toujours en français clair."
         },
         {
           role: "user",
-          content: `Voici les données brutes :\n${data}\n\n${question}`
+          content: `Voici mes données brutes :\n${data}\n\n${question}`
         }
-      ],
+      ]
     });
 
     const output = completion.choices[0].message.content;
     res.json({ success: true, result: output });
   } catch (err) {
-    console.error("Erreur OpenAI:", err);
-    res.json({ success: false, error: err.message });
+    console.error("Erreur OpenAI:", err.response?.data || err.message);
+    res.json({ success: false, error: err.message || "Erreur API" });
   }
 });
 
-/* ---------- démarrage serveur ---------- */
-app.listen(PORT, () => {
-  console.log(`✅ Serveur démarré sur http://localhost:${PORT}`);
+// Lancement du serveur
+app.listen(port, () => {
+  console.log(`🚀 Serveur lancé sur http://localhost:${port}`);
 });
