@@ -12,17 +12,23 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 app.use(express.json());
 app.use(express.static("public"));
 
-/* ---------- ordre SANS 2–5 ---------- */
+/* ---------- ordre COMPLET 2–As ---------- */
 const order = [
-  /* ♠️ */
-  "A♠️","K♠️","Q♠️","J♠️","10♠️","9♠️","8♠️","7♠️","6♠️",
-  /* ♦️ */
-  "A♦️","K♦️","Q♦️","J♦️","10♦️","9♦️","8♦️","7♦️","6♦️",
-  /* ♣️ */
-  "A♣️","K♣️","Q♣️","J♣️","10♣️","9♣️","8♣️","7♣️","6♣️",
-  /* ♥️ */
-  "A♥️","K♥️","Q♥️","J♥️","10♥️","9♥️","8♥️","7♥️","6♥️"
+  // ♠
+  "A♠","K♠","Q♠","J♠","10♠","9♠","8♠","7♠","6♠","5♠","4♠","3♠","2♠",
+  // ♦
+  "A♦","K♦","Q♦","J♦","10♦","9♦","8♦","7♦","6♦","5♦","4♦","3♦","2♦",
+  // ♣
+  "A♣","K♣","Q♣","J♣","10♣","9♣","8♣","7♣","6♣","5♣","4♣","3♣","2♣",
+  // ♥
+  "A♥","K♥","Q♥","J♥","10♥","9♥","8♥","7♥","6♥","5♥","4♥","3♥","2♥"
 ];
+
+/* ---------- normalisation des cartes ---------- */
+function normalize(str) {
+  // Supprime le "variation selector" invisible (\ufe0f)
+  return str.replace(/\ufe0f/g, "");
+}
 
 /* ---------- traitement cartes ---------- */
 function processCardData(input) {
@@ -31,16 +37,17 @@ function processCardData(input) {
 
   for (const line of lines) {
     // Supprimer les tags inutiles
-    const cleanLine = line.replace(/✅|🔵#R|#T\d+|-/g, "").trim();
+    const cleanLine = normalize(line.replace(/✅|🔵#R|#T\d+|-/g, "").trim());
 
     // Extraire la première parenthèse
     const m = cleanLine.match(/#N?(\d+)\.(\d+)\(([^)]+)\)/);
     if (!m) continue;
 
     const [, num, total, cards] = m;
+    const normalizedCards = normalize(cards);
 
     // Chercher toutes les cartes valides dans cette main
-    const foundKeys = order.filter(c => cards.includes(c));
+    const foundKeys = order.filter(c => normalizedCards.includes(c));
     if (!foundKeys.length) continue;
 
     // Ajouter une copie de la main pour chaque carte valide
@@ -96,7 +103,7 @@ app.post("/ask", async (req, res) => {
   const q = question.toLowerCase().trim();
 
   if (q === "nom" || q.includes("nom")) return res.type("text/plain").send("Sossou");
-  if (q === "prénom" || q.includes("prénom") || q === "prenom")
+  if (q === "prénom" || q.includes("prénom") || q.includes("prenom"))
     return res.type("text/plain").send("Kouamé");
   if (q.includes("nom complet") || q.includes("qui es-tu"))
     return res.type("text/plain").send("Sossou Kouamé");
