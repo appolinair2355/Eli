@@ -35,15 +35,83 @@
       resultDiv.className = 'loader';
       resultDiv.textContent = 'Analyse en cours par Kouamé IA…';
 
-      // Question fixe
+      // Question fixe avec exemple complet A → Z
       const question = `Analyse ces mains. 
-- Supprime tous les tags (#T, ✅, 🔵#R, - etc.) 
-- Garde uniquement la première parenthèse de chaque ligne 
-- Classe les cartes extraites selon cet ordre : 
-A♠,K♠,Q♠,J♠,10♠,9♠,8♠,7♠,6♠,
-A♦,K♦,Q♦,J♦,10♦,9♦,8♦,7♦,6♦,
-A♣,K♣,Q♣,J♣,10♣,9♣,8♣,7♣,6♣,
-A♥,K♥,Q♥,J♥,10♥,9♥,8♥,7♥,6♥`;
+
+Règles à suivre :
+1. Supprime tous les tags (#T, ✅, 🔵#R, - etc.)  
+2. Ne garde que la première parenthèse de chaque ligne (ignore la deuxième s’il y en a)  
+3. Classe les cartes extraites selon cet ordre strict :  
+A♠,K♠,Q♠,J♠,10♠,9♠,8♠,7♠,6♠,  
+A♦,K♦,Q♦,J♦,10♦,9♦,8♦,7♦,6♦,  
+A♣,K♣,Q♣,J♣,10♣,9♣,8♣,7♣,6♣,  
+A♥,K♥,Q♥,J♥,10♥,9♥,8♥,7♥,6♥  
+
+### Exemple complet : 
+
+Données brutes :  
+#N1196. ✅8(A♦7♠) - 2(5♦7♣) #T10  
+#N1197. ✅9(A♦8♠) - 5(3♣K♥) #T12  
+#N1198. ✅7(7♣J♥) - 6(3♣3♦) #T13  
+#N1199. ✅8(A♠9♦8♦) - 4(3♥A♦) #T12  
+#N1200. 0(10♣Q♣Q♥) - ✅7(2♣A♥4♠)
+
+Étape 1 : suppression des tags et du contenu après la 2ᵉ parenthèse →  
+#N1196.8(A♦7♠)  
+#N1197.9(A♦8♠)  
+#N1198.7(7♣J♥)  
+#N1199.8(A♠9♦8♦)  
+#N1200.0(10♣Q♣Q♥)
+
+Étape 2 : extraction des cartes 6–10, J, Q, K, A →  
+- Ligne 1196 → A♦, 7♠  
+- Ligne 1197 → A♦, 8♠  
+- Ligne 1198 → 7♣, J♥  
+- Ligne 1199 → A♠, 9♦, 8♦  
+- Ligne 1200 → 10♣, Q♣, Q♥  
+
+Étape 3 : classement selon l’ordre défini →  
+
+A♠  
+#N1199.8(A♠9♦8♦)  
+
+9♠  
+#N1199.8(A♠9♦8♦)  
+
+8♠  
+#N1197.9(A♦8♠)  
+
+7♠  
+#N1196.8(A♦7♠)  
+
+A♦  
+#N1196.8(A♦7♠)  
+#N1197.9(A♦8♠)  
+
+9♦  
+#N1199.8(A♠9♦8♦)  
+
+8♦  
+#N1199.8(A♠9♦8♦)  
+
+Q♣  
+#N1200.0(10♣Q♣Q♥)  
+
+10♣  
+#N1200.0(10♣Q♣Q♥)  
+
+7♣  
+#N1198.7(7♣J♥)  
+
+Q♥  
+#N1200.0(10♣Q♣Q♥)  
+
+J♥  
+#N1198.7(7♣J♥)  
+
+---
+
+Ensuite applique exactement la même logique sur mes données ci-dessous :`;
 
       try {
         const res = await fetch('/ask', {
