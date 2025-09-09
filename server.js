@@ -26,8 +26,11 @@ const order = [
 
 /* ---------- normalisation des cartes ---------- */
 function normalize(str) {
-  // Supprime le "variation selector" invisible (\ufe0f)
-  return str.replace(/\ufe0f/g, "");
+  return str
+    .replace(/\ufe0f/g, "")   // supprime variation selector invisible
+    .replace(/T/g, "10")      // T → 10
+    .replace(/1\s0/g, "10")   // "1 0" → "10"
+    .trim();
 }
 
 /* ---------- traitement cartes ---------- */
@@ -36,7 +39,7 @@ function processCardData(input) {
   const hands = [];
 
   for (const line of lines) {
-    // Supprimer les tags inutiles
+    // Supprimer les tags inutiles et normaliser
     const cleanLine = normalize(line.replace(/✅|🔵#R|#T\d+|-/g, "").trim());
 
     // Extraire la première parenthèse
@@ -47,7 +50,10 @@ function processCardData(input) {
     const normalizedCards = normalize(cards);
 
     // Chercher toutes les cartes valides dans cette main
-    const foundKeys = order.filter(c => normalizedCards.includes(c));
+    const foundKeys = order
+      .map(normalize)
+      .filter(c => normalizedCards.includes(c));
+
     if (!foundKeys.length) continue;
 
     // Ajouter une copie de la main pour chaque carte valide
@@ -62,7 +68,8 @@ function processCardData(input) {
   if (!hands.length) return "(Aucune main valide trouvée)";
 
   // Trier selon l’ordre global
-  hands.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+  const normalizedOrder = order.map(normalize);
+  hands.sort((a, b) => normalizedOrder.indexOf(a.key) - normalizedOrder.indexOf(b.key));
 
   // Regrouper
   const grouped = [];
