@@ -5,49 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Kouamé IA – Analyse des cartes</title>
   <style>
-    body{
-      font-family:Arial,Helvetica,sans-serif;
-      max-width:900px;
-      margin:0 auto;
-      padding:20px;
-      background:#1e1e1e; /* fond sombre */
-      color:#fff; /* texte blanc */
-    }
-    textarea{
-      width:100%;
-      height:200px;
-      padding:10px;
-      border:1px solid #444;
-      border-radius:5px;
-      font-family:monospace;
-      resize:vertical;
-      background:#2a2a2a;
-      color:#fff;
-    }
-    button{
-      background:#007bff;
-      color:#fff;
-      padding:10px 20px;
-      border:none;
-      border-radius:5px;
-      cursor:pointer;
-      font-size:16px;
-      margin-top:10px
-    }
+    body{font-family:Arial,Helvetica,sans-serif;max-width:800px;margin:0 auto;padding:20px;background:#f5f5f5}
+    textarea{width:100%;height:200px;padding:10px;border:1px solid #ddd;border-radius:5px;font-family:monospace;resize:vertical}
+    button{background:#007bff;color:#fff;padding:10px 20px;border:none;border-radius:5px;cursor:pointer;font-size:16px;margin-top:10px}
     button:hover{background:#0056b3}
-    #result{
-      margin-top:20px;
-      padding:15px;
-      background:#2a2a2a;
-      border-radius:5px;
-      white-space:pre-wrap;
-      font-family:monospace;
-      min-height:50px;
-      color:#fff;
-    }
-    .loader{color:#ff9800;font-weight:bold}
-    .success{color:#fff}
-    .error{color:red;background:#400}
+    #result{margin-top:20px;padding:15px;background:#c0c0c0;border-radius:5px;white-space:pre-wrap;font-family:monospace;min-height:50px}
+    .loader{color:#007bff;font-weight:bold}
+    .success{color:green;background:#e6ffe6}
+    .error{color:red;background:#ffe6e6}
   </style>
 </head>
 <body>
@@ -57,7 +22,7 @@
   <textarea id="input" placeholder="Collez vos données ici..."></textarea>
   <br>
 
-  <!-- Bouton -->
+  <!-- Bouton unique -->
   <button onclick="askIA()">Analyser avec Kouamé IA</button>
 
   <!-- Résultat -->
@@ -70,98 +35,83 @@
       resultDiv.className = 'loader';
       resultDiv.textContent = 'Analyse en cours par Kouamé IA…';
 
-      // Question précise et structurée
+      // Question fixe avec exemple complet A → Z
       const question = `Analyse ces mains. 
 
 Règles à suivre :
-1. Supprime tous les tags (#T, ✅, 🔵#R, - etc.)
-2. Ne garde que la première parenthèse de chaque ligne (ignore la deuxième s’il y en a)
-3. Chaque carte doit être traitée comme un bloc valeur+symbole collés (ex: A♠, 10♦, Q♥)
-4. Classe et regroupe les cartes extraites selon cet ordre strict :
-A♠,K♠,Q♠,J♠,10♠,9♠,8♠,7♠,6♠,
-A♦,K♦,Q♦,J♦,10♦,9♦,8♦,7♦,6♦,
-A♣,K♣,Q♣,J♣,10♣,9♣,8♣,7♣,6♣,
-A♥,K♥,Q♥,J♥,10♥,9♥,8♥,7♥,6♥
+1. Supprime tous les tags (#T, ✅, 🔵#R, - etc.)  
+2. Ne garde que la première parenthèse de chaque ligne (ignore la deuxième s'il y en a)  
+3. Classe les cartes extraites selon cet ordre strict :  
+A♠️,K♠️,Q♠️,J♠️,10♠️,9♠️,8♠️,7♠️,6♠️,  
+A♦️,K♦️,Q♦️,J♦️,10♦️,9♦️,8♦️,7♦️,6♦️,  
+A♣️,K♣️,Q♣️,J♣️,10♣️,9♣️,8♣️,7♣️,6♣️,  
+A❤️,K❤️,Q❤️,J❤️,10❤️,9❤️,8❤️,7❤️,6❤️  
 
-⚠️ Réponds toujours avec ce format final clair :
+### Exemple complet : 
 
-### Liste finale triée
+Données brutes :  
+#N1196. ✅8(A♦️7♠️) - 2(5♦️7♣️) #T10  
+#N1197. ✅9(A♦️8♠️) - 5(3♣️K❤️) #T12  
+#N1198. ✅7(7♣️J❤️) - 6(3♣️3♦️) #T13  
+#N1199. ✅8(A♠️9♦️8♦️) - 4(3❤️A♦️) #T12  
+#N1200. 0(10♣️Q♣️Q❤️) - ✅7(2♣️A❤️4♠️)
 
-♠️ Pique :
-- A♠ → (lignes concernées)
-- K♠ → ...
-- Q♠ → ...
-- J♠ → ...
-- 10♠ → ...
-- 9♠ → ...
-- 8♠ → ...
-- 7♠ → ...
-- 6♠ → ...
+Étape 1 : suppression des tags et du contenu après la 2ᵉ parenthèse →  
+#N1196.8(A♦️7♠️)  
+#N1197.9(A♦️8♠️)  
+#N1198.7(7♣️J❤️)  
+#N1199.8(A♠️9♦️8♦️)  
+#N1200.0(10♣️Q♣️Q❤️)
 
-♦️ Carreau :
-- A♦ → ...
-- K♦ → ...
-...
+Étape 2 : extraction des cartes 6–10, J, Q, K, A →  
+- Ligne 1196 → A♦️, 7♠️  
+- Ligne 1197 → A♦️, 8♠️  
+- Ligne 1198 → 7♣️, J❤️  
+- Ligne 1199 → A♠️, 9♦️, 8♦️  
+- Ligne 1200 → 10♣️, Q♣️, Q❤️  
 
-♣️ Trèfle :
-- A♣ → ...
-...
+Étape 3 : classement selon l'ordre défini →  
 
-♥️ Cœur :
-- A♥ → ...
-...
+A♠️  
+#N1199.8(A♠️9♦️8♦️)  
 
----
+9♠️  
+#N1199.8(A♠️9♦️8♦️)  
 
-### Exemple clair : 
+8♠️  
+#N1197.9(A♦️8♠️)  
 
-Données brutes :
-#N1196. ✅8(A♦7♠) - 2(5♦7♣) #T10  
-#N1197. ✅9(A♦8♠) - 5(3♣K♥) #T12  
-#N1198. ✅7(7♣J♥) - 6(3♣3♦) #T13  
-#N1199. ✅8(A♠9♦8♦) - 4(3♥A♦) #T12  
-#N1200. 0(10♣Q♣Q♥) - ✅7(2♣A♥4♠)
+7♠️  
+#N1196.8(A♦️7♠️)  
 
-Étape 1 : nettoyage →  
-#N1196.8(A♦7♠)  
-#N1197.9(A♦8♠)  
-#N1198.7(7♣J♥)  
-#N1199.8(A♠9♦8♦)  
-#N1200.0(10♣Q♣Q♥)
+A♦️  
+#N1196.8(A♦️7♠️)  
+#N1197.9(A♦️8♠️)  
 
-Étape 2 : extraction →  
-- Ligne 1196 → A♦, 7♠  
-- Ligne 1197 → A♦, 8♠  
-- Ligne 1198 → 7♣, J♥  
-- Ligne 1199 → A♠, 9♦, 8♦  
-- Ligne 1200 → 10♣, Q♣, Q♥  
+9♦️  
+#N1199.8(A♠️9♦️8♦️)  
 
-Étape 3 : format final trié →  
+8♦️  
+#N1199.8(A♠️9♦️8♦️)  
 
-### Liste finale triée
+Q♣️  
+#N1200.0(10♣️Q♣️Q❤️)  
 
-♠️ Pique :
-- A♠ → #N1199.8(A♠9♦8♦)
-- 8♠ → #N1197.9(A♦8♠)
-- 7♠ → #N1196.8(A♦7♠)
+10♣️  
+#N1200.0(10♣️Q♣️Q❤️)  
 
-♦️ Carreau :
-- A♦ → #N1196.8(A♦7♠), #N1197.9(A♦8♠)
-- 9♦ → #N1199.8(A♠9♦8♦)
-- 8♦ → #N1199.8(A♠9♦8♦)
+7♣️  
+#N1198.7(7♣️J❤️)  
 
-♣️ Trèfle :
-- Q♣ → #N1200.0(10♣Q♣Q♥)
-- 10♣ → #N1200.0(10♣Q♣Q♥)
-- 7♣ → #N1198.7(7♣J♥)
+Q❤️  
+#N1200.0(10♣️Q♣️Q❤️)  
 
-♥️ Cœur :
-- Q♥ → #N1200.0(10♣Q♣Q♥)
-- J♥ → #N1198.7(7♣J♥)
+J❤️  
+#N1198.7(7♣️J❤️)  
 
 ---
 
-Maintenant applique cette même logique sur mes données ci-dessous :`;
+Ensuite applique exactement la même logique sur mes données ci-dessous :`;
 
       try {
         const res = await fetch('/ask', {
@@ -170,6 +120,7 @@ Maintenant applique cette même logique sur mes données ci-dessous :`;
           body: JSON.stringify({ data: input, question })
         });
 
+        // lecture en flux (stream OpenAI)
         const reader = res.body.getReader();
         const decoder = new TextDecoder("utf-8");
         resultDiv.className = 'success';
