@@ -13,14 +13,14 @@ app.use(express.static("public"));
 
 /* -------- ordre EXACT demandé (6 → A) -------- */
 const ORDER_6A = [
-  // ♠
-  "A♠","K♠","Q♠","J♠","10♠","9♠","8♠","7♠","6♠",
-  // ♦
-  "A♦","K♦","Q♦","J♦","10♦","9♦","8♦","7♦","6♦",
-  // ♣
-  "A♣","K♣","Q♣","J♣","10♣","9♣","8♣","7♣","6♣",
-  // ♥
-  "A♥","K♥","Q♥","J♥","10♥","9♥","8♥","7♥","6♥"
+  // ♠️
+  "A♠️","K♠️","Q♠️","J♠️","10♠️","9♠️","8♠️","7♠️","6♠️",
+  // ♦️
+  "A♦️","K♦️","Q♦️","J♦️","10♦️","9♦️","8♦️","7♦️","6♦️",
+  // ♣️
+  "A♣️","K♣️","Q♣️","J♣️","10♣️","9♣️","8♣️","7♣️","6♣️",
+  // ❤️
+  "A❤️","K❤️","Q❤️","J❤️","10❤️","9❤️","8❤️","7❤️","6❤️"
 ];
 
 /* -------- normalisation -------- */
@@ -34,10 +34,10 @@ function normalize(str = "") {
 }
 
 /* -------- utilitaires -------- */
-const CARD_RE_6A = /(10|[6-9]|[AJQK])[♠♦♣♥]/g;
+const CARD_RE_6A = /(10|[6-9]|[AJQK])[♠️♦️♣️❤️]/g;
 
 function firstParenContent(line) {
-  const m = line.match(/\(([^)]*)\)/);
+  const m = line.match(/ $([^)]*)$/);
   return m ? m[1] : "";
 }
 
@@ -46,7 +46,7 @@ function extractNumTotal(line) {
   return m ? { num: m[1], total: m[2] } : { num: "?", total: "?" };
 }
 
-/* -------- traitement déterministe pour “Analyse ces mains …” -------- */
+/* -------- traitement déterministe pour "Analyse ces mains …" -------- */
 function analyzeHandsDeterministic(rawInput) {
   const lines = String(rawInput).split(/\r?\n/).map(normalize).filter(Boolean);
   const results = [];
@@ -61,7 +61,7 @@ function analyzeHandsDeterministic(rawInput) {
     const inside = normalize(firstParenContent(clean));
     if (!inside) continue;
 
-    // 3) n’extraire que 6–10, J, Q, K, A
+    // 3) n'extraire que 6–10, J, Q, K, A
     const cards = [...inside.matchAll(CARD_RE_6A)].map(m => m[0]);
     if (!cards.length) continue;
 
@@ -106,7 +106,7 @@ function analyzeHandsDeterministic(rawInput) {
 
 /* -------- routes -------- */
 
-// (Optionnel) on garde /process si tu veux tester l’algo depuis l’autre bouton
+// (Optionnel) on garde /process si tu veux tester l'algo depuis l'autre bouton
 app.post("/process", (req, res) => {
   try {
     const result = analyzeHandsDeterministic(req.body.data || "");
@@ -120,7 +120,7 @@ app.post("/ask", async (req, res) => {
   const { data, question } = req.body || {};
   const q = normalize(question || "").toLowerCase();
 
-  // 🚦 Cas déterministe : on bypass l’IA pour garantir l’ordre exact
+  // 🚦 Cas déterministe : on bypass l'IA pour garantir l'ordre exact
   if (q.startsWith("analyse ces mains")) {
     try {
       const text = analyzeHandsDeterministic(data || "");
@@ -130,12 +130,12 @@ app.post("/ask", async (req, res) => {
     }
   }
 
-  // 🤖 Sinon, on passe par OpenAI (pour d’autres questions libres)
+  // 🤖 Sinon, on passe par OpenAI (pour d'autres questions libres)
   try {
     const stream = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "Tu es un assistant spécialisé dans l’analyse de mains de cartes. Réponds en français." },
+        { role: "system", content: "Tu es un assistant spécialisé dans l'analyse de mains de cartes. Réponds en français." },
         { role: "user", content: `Mains :\n${data}\n\nQuestion : ${question}` }
       ],
       stream: true
@@ -153,3 +153,4 @@ app.post("/ask", async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`✅ Serveur démarré sur le port ${PORT}`));
+      
