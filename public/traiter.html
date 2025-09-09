@@ -3,98 +3,172 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Kouamé IA - Analyse des cartes</title>
+  <title>Kouamé IA – Analyse des cartes</title>
   <style>
-    body { background:#fff; color:#000; font-family:Arial, sans-serif; padding:20px; }
-    textarea { width:100%; height:200px; padding:10px; border:1px solid #ccc; border-radius:8px; }
-    button { margin-top:10px; padding:10px 20px; border:none; border-radius:8px; background:#007bff; color:#fff; cursor:pointer; }
-    button:hover { background:#0056b3; }
-    #result { margin-top:20px; padding:15px; border:1px solid #ddd; border-radius:8px; white-space:pre-wrap; }
+    body{
+      font-family:Arial,Helvetica,sans-serif;
+      max-width:800px;
+      margin:0 auto;
+      padding:20px;
+      background:#f5f5f5
+    }
+    textarea{
+      width:100%;
+      height:200px;
+      padding:10px;
+      border:1px solid #ddd;
+      border-radius:5px;
+      font-family:monospace;
+      resize:vertical
+    }
+    button{
+      background:#007bff;
+      color:#fff;
+      padding:10px 20px;
+      border:none;
+      border-radius:5px;
+      cursor:pointer;
+      font-size:16px;
+      margin-top:10px
+    }
+    button:hover{background:#0056b3}
+    #result{
+      margin-top:20px;
+      padding:15px;
+      background:#ffffff; /* fond blanc */
+      border-radius:5px;
+      white-space:pre-wrap;
+      font-family:monospace;
+      min-height:50px
+    }
+    .loader{color:#007bff;font-weight:bold}
+    .success{background:#ffffff;color:inherit} /* fond blanc et vraies couleurs */
+    .error{color:red;background:#ffe6e6}
   </style>
 </head>
 <body>
-  <h1>Kouamé IA</h1>
-  <textarea id="input" placeholder="Collez vos données brutes ici..."></textarea>
+  <h1>Kouamé IA – Analyse des cartes</h1>
+
+  <!-- Zone de saisie -->
+  <textarea id="input" placeholder="Collez vos données ici..."></textarea>
   <br>
-  <button onclick="askIA()">Analyser avec IA</button>
+
+  <!-- Bouton -->
+  <button onclick="askIA()">Analyser avec Kouamé IA</button>
+
+  <!-- Résultat -->
   <div id="result"></div>
 
   <script>
     async function askIA() {
-      const input = document.getElementById("input").value;
-      const resultDiv = document.getElementById("result");
-      resultDiv.textContent = "Analyse en cours…";
+      const input = document.getElementById('input').value;
+      const resultDiv = document.getElementById('result');
+      resultDiv.className = 'loader';
+      resultDiv.textContent = 'Analyse en cours par Kouamé IA…';
 
-      const question = `
-Analyse ces mains :
-- Supprime tous les tags (#T, ✅, 🔵#R, - etc.)
-- Garde uniquement la première parenthèse de chaque ligne
-- Classe les cartes extraites selon cet ordre :
-A♠,K♠,Q♠,J♠,10♠,9♠,8♠,7♠,6♠,
-A♦,K♦,Q♦,J♦,10♦,9♦,8♦,7♦,6♦,
-A♣,K♣,Q♣,J♣,10♣,9♣,8♣,7♣,6♣,
-A♥,K♥,Q♥,J♥,10♥,9♥,8♥,7♥,6♥
+      // Question ultra-précise
+      const question = `Analyse ces mains. 
 
-Exemple pour t’inspirer :
+Règles à suivre :
+1. Supprime tous les tags (#T, ✅, 🔵#R, - etc.).  
+2. Ne garde que la première parenthèse de chaque ligne (ignore la deuxième s’il y en a).  
+3. Considère chaque carte comme une **valeur + une couleur collées** (exemples : A♦, 7♠, Q♥, 10♣).  
+   👉 Ce sont ces entités entières qu’il faut traiter et classer.  
+4. Classe toutes les cartes selon cet ordre strict (ordre numérique 1 → 36) :  
 
-Données brutes :
-✅ #N1.2(A♠️,10♦️,K♦️)(extra)
-- #N2.1(4♣️,J♦️,J♥️)(bonus)
-🔵#R #N3.3(3♥️,7♦️,A♣️)(autre)
-#T12 #N4.2(7♣️,10♥️)(reste)
+1=A♠, 2=K♠, 3=Q♠, 4=J♠, 5=10♠, 6=9♠, 7=8♠, 8=7♠, 9=6♠  
+10=A♦, 11=K♦, 12=Q♦, 13=J♦, 14=10♦, 15=9♦, 16=8♦, 17=7♦, 18=6♦  
+19=A♣, 20=K♣, 21=Q♣, 22=J♣, 23=10♣, 24=9♣, 25=8♣, 26=7♣, 27=6♣  
+28=A♥, 29=K♥, 30=Q♥, 31=J♥, 32=10♥, 33=9♥, 34=8♥, 35=7♥, 36=6♥  
 
-Résultat attendu :
-A♠
-#N1.2(A♠️,10♦️,K♦️)
+👉 Affiche les cartes triées dans cet ordre exact avec leur ligne nettoyée (#N…(...)).  
 
-K♦
-#N1.2(A♠️,10♦️,K♦️)
+---
 
-10♦
-#N1.2(A♠️,10♦️,K♦️)
+### Exemple complet : 
 
-J♦
-#N2.1(4♣️,J♦️,J♥️)
+Données brutes :  
+#N1196. ✅8(A♦7♠) - 2(5♦7♣) #T10  
+#N1197. ✅9(A♦8♠) - 5(3♣K♥) #T12  
+#N1198. ✅7(7♣J♥) - 6(3♣3♦) #T13  
+#N1199. ✅8(A♠9♦8♦) - 4(3♥A♦) #T12  
+#N1200. 0(10♣Q♣Q♥) - ✅7(2♣A♥4♠)
 
-J♥
-#N2.1(4♣️,J♦️,J♥️)
+Étape 1 : suppression des tags et de la 2ᵉ parenthèse →  
+#N1196.8(A♦7♠)  
+#N1197.9(A♦8♠)  
+#N1198.7(7♣J♥)  
+#N1199.8(A♠9♦8♦)  
+#N1200.0(10♣Q♣Q♥)
 
-4♣
-#N2.1(4♣️,J♦️,J♥️)
+Étape 2 : extraction des cartes entières (valeur+couleur collées) →  
+- Ligne 1196 → A♦, 7♠  
+- Ligne 1197 → A♦, 8♠  
+- Ligne 1198 → 7♣, J♥  
+- Ligne 1199 → A♠, 9♦, 8♦  
+- Ligne 1200 → 10♣, Q♣, Q♥  
 
-3♥
-#N3.3(3♥️,7♦️,A♣️)
+Étape 3 : classement numérique (1–36) →  
 
-7♦
-#N3.3(3♥️,7♦️,A♣️)
+1. A♠  
+   #N1199.8(A♠9♦8♦)  
 
-A♣
-#N3.3(3♥️,7♦️,A♣️)
+8. 7♠  
+   #N1196.8(A♦7♠)  
 
-7♣
-#N4.2(7♣️,10♥️)
+7. 8♠  
+   #N1197.9(A♦8♠)  
 
-10♥
-#N4.2(7♣️,10♥️)
+10. A♦  
+    #N1196.8(A♦7♠)  
+    #N1197.9(A♦8♠)  
 
-Maintenant fais la même chose avec mes données :
-      `;
+15. 9♦  
+    #N1199.8(A♠9♦8♦)  
+
+16. 8♦  
+    #N1199.8(A♠9♦8♦)  
+
+21. Q♣  
+    #N1200.0(10♣Q♣Q♥)  
+
+23. 10♣  
+    #N1200.0(10♣Q♣Q♥)  
+
+26. 7♣  
+    #N1198.7(7♣J♥)  
+
+30. Q♥  
+    #N1200.0(10♣Q♣Q♥)  
+
+31. J♥  
+    #N1198.7(7♣J♥)  
+
+---
+
+Maintenant applique exactement la même logique sur mes données ci-dessous :`;
 
       try {
-        const res = await fetch("/ask", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        const res = await fetch('/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: input, question })
         });
 
-        const json = await res.json();
-        if (json.success) {
-          resultDiv.textContent = json.result;
-        } else {
-          resultDiv.textContent = "Erreur : " + json.error;
+        // lecture en flux (stream OpenAI)
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        resultDiv.className = 'success';
+        resultDiv.textContent = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          resultDiv.textContent += decoder.decode(value, { stream: true });
         }
       } catch (err) {
-        resultDiv.textContent = "Erreur : " + err.message;
+        resultDiv.className = 'error';
+        resultDiv.textContent = 'Erreur : ' + err.message;
       }
     }
   </script>
