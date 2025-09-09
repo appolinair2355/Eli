@@ -12,12 +12,16 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 app.use(express.json());
 app.use(express.static('public'));
 
-/* ---------- ordre des cartes ---------- */
+/* ---------- ordre COMPLET 52 cartes ---------- */
 const order = [
-  'A♠️','K♠️','Q♠️','J♠️','10♠️','9♠️','8♠️','7♠️','6♠️',
-  'A♦️','K♦️','Q♦️','J♦️','10♦️','9♦️','8♦️','7♦️','6♦️',
-  'A♣️','K♣️','Q♣️','J♣️','10♣️','9♣️','8♣️','7♣️','6♣️',
-  'A♥️','K♥️','Q♥️','J♥️','10♥️','9♥️','8♥️','7♥️','6♥️'
+  /* ♠️ */
+  'A♠️','K♠️','Q♠️','J♠️','10♠️','9♠️','8♠️','7♠️','6♠️','5♠️','4♠️','3♠️','2♠️',
+  /* ♦️ */
+  'A♦️','K♦️','Q♦️','J♦️','10♦️','9♦️','8♦️','7♦️','6♦️','5♦️','4♦️','3♦️','2♦️',
+  /* ♣️ */
+  'A♣️','K♣️','Q♣️','J♣️','10♣️','9♣️','8♣️','7♣️','6♣️','5♣️','4♣️','3♣️','2♣️',
+  /* ♥️ */
+  'A♥️','K♥️','Q♥️','J♥️','10♥️','9♥️','8♥️','7♥️','6♥️','5♥️','4♥️','3♥️','2♥️'
 ];
 
 function processCardData(input) {
@@ -43,7 +47,7 @@ function processCardData(input) {
   }
   const out = [];
   grouped.forEach(g => { out.push(g.key); out.push(...g.lines); });
-  return out.join('\n');
+  return out.length ? out.join('\n') : '(Aucune main valide trouvée)';
 }
 
 /* ---------- routes ---------- */
@@ -94,4 +98,4 @@ app.post('/ask', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Serveur démarré sur le port ${PORT}`));
-    
+             
