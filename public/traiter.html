@@ -9,8 +9,10 @@
     textarea{width:100%;height:200px;padding:10px;border:1px solid #ddd;border-radius:5px;font-family:monospace;resize:vertical}
     button{background:#007bff;color:#fff;padding:10px 20px;border:none;border-radius:5px;cursor:pointer;font-size:16px;margin-top:10px}
     button:hover{background:#0056b3}
-    #result{margin-top:20px;padding:15px;background:#f8f9fa;border-radius:5px;white-space:pre-wrap;font-family:monospace}
+    #result{margin-top:20px;padding:15px;background:#c0c0c0;border-radius:5px;white-space:pre-wrap;font-family:monospace;min-height:50px}
     .loader{color:#007bff;font-weight:bold}
+    .success{color:green;background:#e6ffe6}
+    .error{color:red;background:#ffe6e6}
   </style>
 </head>
 <body>
@@ -24,7 +26,8 @@
     async function processData() {
       const input = document.getElementById('input').value;
       const resultDiv = document.getElementById('result');
-      resultDiv.innerHTML = '<span class="loader">Traitement en cours…</span>';
+      resultDiv.className = 'loader';
+      resultDiv.textContent = 'Traitement en cours…';
 
       try {
         const res = await fetch('/process', {
@@ -33,9 +36,10 @@
           body: JSON.stringify({ data: input })
         });
         const json = await res.json();
+
         if (json.success) {
           resultDiv.className = 'success';
-          resultDiv.textContent = json.result;
+          resultDiv.textContent = json.result || '(Aucune main valide trouvée)';
         } else {
           resultDiv.className = 'error';
           resultDiv.textContent = 'Erreur : ' + json.error;
