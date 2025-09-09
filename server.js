@@ -1,7 +1,6 @@
 /* server.js – Render.com – port 10000 */
 require("dotenv").config();
 const express = require("express");
-const path = require("path");
 const { OpenAI } = require("openai");
 
 const app = express();
@@ -12,7 +11,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 app.use(express.json());
 app.use(express.static("public"));
 
-/* ---------- ordre COMPLET 2–As ---------- */
+/* ---------- ordre COMPLET 2–As (sans variation emoji) ---------- */
 const order = [
   // ♠
   "A♠","K♠","Q♠","J♠","10♠","9♠","8♠","7♠","6♠","5♠","4♠","3♠","2♠",
@@ -24,72 +23,77 @@ const order = [
   "A♥","K♥","Q♥","J♥","10♥","9♥","8♥","7♥","6♥","5♥","4♥","3♥","2♥"
 ];
 
-/* ---------- normalisation des cartes ---------- */
-function normalize(str) {
-  return str
-    .replace(/\ufe0f/g, "")   // supprime variation selector invisible
-    .replace(/T/g, "10")      // T → 10
-    .replace(/1\s0/g, "10")   // "1 0" → "10"
+/* ---------- normalisation robuste ---------- */
+function normalize(str = "") {
+  return String(str)
+    .replace(/\ufe0f/g, "")      // variation selector invisible
+    .replace(/T/g, "10")         // T → 10
+    .replace(/1\D?0/g, "10")     // "1 0" ou "1-0" → "10"
+    .replace(/\s+/g, " ")        // espaces multiples → 1 espace
     .trim();
 }
 
+/* ---------- regex carte : (10|2-9|A|J|Q|K) suivi d'un symbole ♥♦♣♠ ---------- */
+const CARD_RE = /(10|[2-9]|[AJQK])[♠♦♣♥]/g;
+
 /* ---------- traitement cartes ---------- */
 function processCardData(input) {
-  const lines = input.trim().split("\n").filter(Boolean);
+  const lines = normalize(input).split(/\r?\n/).filter(Boolean);
   const hands = [];
 
-  for (const line of lines) {
-    // Supprimer les tags inutiles et normaliser
-    const cleanLine = normalize(line.replace(/✅|🔵#R|#T\d+|-/g, "").trim());
+  for (const rawLine of lines) {
+    // on enlève les tags bruyants puis on normalise
+    const line = normalize(
+      rawLine.replace(/✅|🔵#R|#R|#T\d+|—|–|-/g, " ")
+    );
 
-    // Extraire la première parenthèse
-    const m = cleanLine.match(/#N?(\d+)\.(\d+)\(([^)]+)\)/);
-    if (!m) continue;
+    // on essaie d'extraire N° et total si présents
+    const head = line.match(/#N?(\d+)\.(\d+)/);
+    const num = head ? head[1] : "?";
+    const total = head ? head[2] : "?";
 
-    const [, num, total, cards] = m;
-    const normalizedCards = normalize(cards);
+    // on scanne TOUTES les parenthèses de la ligne (il peut y en avoir 2)
+    const parens = [...line.matchAll(/\(([^)]*)\)/g)];
+    if (parens.length === 0) continue;
 
-    // Chercher toutes les cartes valides dans cette main
-    const foundKeys = order
-      .map(normalize)
-      .filter(c => normalizedCards.includes(c));
+    for (const p of parens) {
+      const inside = normalize(p[1]);
 
-    if (!foundKeys.length) continue;
+      // on extrait toutes les cartes avec la regex
+      const cards = [...inside.matchAll(CARD_RE)].map(m => m[0]);
+      if (cards.length === 0) continue;
 
-    // Ajouter une copie de la main pour chaque carte valide
-    for (const key of foundKeys) {
-      hands.push({
-        key,
-        line: `#N${num}.${total}(${cards})`
-      });
+      for (const key of cards) {
+        hands.push({
+          key,
+          line: `#N${num}.${total}(${inside})`
+        });
+      }
     }
   }
 
   if (!hands.length) return "(Aucune main valide trouvée)";
 
-  // Trier selon l’ordre global
-  const normalizedOrder = order.map(normalize);
-  hands.sort((a, b) => normalizedOrder.indexOf(a.key) - normalizedOrder.indexOf(b.key));
+  // tri selon l’ordre global (normalisé)
+  const normOrder = order.map(normalize);
+  hands.sort((a, b) => normOrder.indexOf(a.key) - normOrder.indexOf(b.key));
 
-  // Regrouper
+  // regrouper par carte
   const grouped = [];
-  let lastKey = null;
+  let last = null;
   for (const h of hands) {
-    if (h.key !== lastKey) {
-      grouped.push({ key: h.key, lines: [] });
-    }
+    if (h.key !== last) grouped.push({ key: h.key, lines: [] });
     grouped[grouped.length - 1].lines.push(h.line);
-    lastKey = h.key;
+    last = h.key;
   }
 
-  // Construire sortie
+  // construire la sortie (évite doublons de lignes par carte)
   const out = [];
-  grouped.forEach(g => {
+  for (const g of grouped) {
     out.push(g.key);
-    out.push(...[...new Set(g.lines)]); // éviter doublons
+    out.push(...[...new Set(g.lines)]);
     out.push("");
-  });
-
+  }
   return out.join("\n").trim();
 }
 
@@ -116,19 +120,12 @@ app.post("/ask", async (req, res) => {
     return res.type("text/plain").send("Sossou Kouamé");
 
   const devKeywords = [
-    "développeur",
-    "developpeur",
-    "créateur",
-    "auteur",
-    "qui a fait",
-    "qui est l'auteur"
+    "développeur","developpeur","créateur","auteur","qui a fait","qui est l'auteur"
   ];
   if (devKeywords.some(kw => q.includes(kw))) {
     return res
       .type("text/plain")
-      .send(
-        "SOSSOU Kouamé Appolinaire est le développeur de cette IA. Né en Côte d’Ivoire, technicien supérieur en génie civil, il crée aussi des bots Telegram. WhatsApp : +229 01 67 92 40 76."
-      );
+      .send("SOSSOU Kouamé Appolinaire est le développeur de cette IA. Né en Côte d’Ivoire, technicien supérieur en génie civil, il crée aussi des bots Telegram. WhatsApp : +229 01 67 92 40 76.");
   }
 
   try {
