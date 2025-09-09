@@ -3,125 +3,98 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Kouamé IA - Traitement des cartes</title>
+  <title>Kouamé IA - Analyse des cartes</title>
   <style>
-    body {
-      font-family: monospace;
-      background-color: black;
-      color: white;
-      padding: 20px;
-      white-space: pre-wrap;
-    }
-
-    textarea {
-      width: 100%;
-      height: 200px;
-      padding: 10px;
-      border-radius: 8px;
-      border: none;
-      font-family: monospace;
-    }
-
-    button {
-      margin-top: 10px;
-      background: #007bff;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    button:hover {
-      background: #0056b3;
-    }
-
-    #resultat {
-      margin-top: 20px;
-      padding: 15px;
-      background: #222;
-      border-radius: 8px;
-      min-height: 100px;
-    }
-
-    /* Couleurs des cartes */
-    .spade, .club {
-      color: black;
-      background: white; /* pour bien voir le noir sur fond noir */
-      padding: 1px 3px;
-      border-radius: 3px;
-    }
-    .heart, .diamond {
-      color: red;
-    }
+    body { background:#fff; color:#000; font-family:Arial, sans-serif; padding:20px; }
+    textarea { width:100%; height:200px; padding:10px; border:1px solid #ccc; border-radius:8px; }
+    button { margin-top:10px; padding:10px 20px; border:none; border-radius:8px; background:#007bff; color:#fff; cursor:pointer; }
+    button:hover { background:#0056b3; }
+    #result { margin-top:20px; padding:15px; border:1px solid #ddd; border-radius:8px; white-space:pre-wrap; }
   </style>
 </head>
 <body>
   <h1>Kouamé IA</h1>
-  <p>Collez vos données ci-dessous :</p>
-  <textarea id="input"></textarea><br>
-  <button onclick="analyser()">Kouamé IA</button>
-
-  <div id="resultat"></div>
+  <textarea id="input" placeholder="Collez vos données brutes ici..."></textarea>
+  <br>
+  <button onclick="askIA()">Analyser avec IA</button>
+  <div id="result"></div>
 
   <script>
-    // Fonction pour coloriser les cartes
-    function colorizeCards(text) {
-      return text
-        .replace(/♠/g, '<span class="spade">♠</span>')
-        .replace(/♣/g, '<span class="club">♣</span>')
-        .replace(/♥/g, '<span class="heart">♥</span>')
-        .replace(/♦/g, '<span class="diamond">♦</span>');
-    }
-
-    async function analyser() {
+    async function askIA() {
       const input = document.getElementById("input").value;
-      const resultatDiv = document.getElementById("resultat");
-      resultatDiv.innerHTML = "⏳ Analyse en cours...";
+      const resultDiv = document.getElementById("result");
+      resultDiv.textContent = "Analyse en cours…";
 
-      // Exemple clair inclus dans la consigne
-      const consigne = `
+      const question = `
 Analyse ces mains :
-
-1. Supprime tous les tags (#T, ✅, 🔵#R, etc.)
-2. Garde uniquement la première parenthèse de chaque ligne
-3. Classe les cartes extraites selon cet ordre :
+- Supprime tous les tags (#T, ✅, 🔵#R, - etc.)
+- Garde uniquement la première parenthèse de chaque ligne
+- Classe les cartes extraites selon cet ordre :
 A♠,K♠,Q♠,J♠,10♠,9♠,8♠,7♠,6♠,
 A♦,K♦,Q♦,J♦,10♦,9♦,8♦,7♦,6♦,
 A♣,K♣,Q♣,J♣,10♣,9♣,8♣,7♣,6♣,
 A♥,K♥,Q♥,J♥,10♥,9♥,8♥,7♥,6♥
 
-Exemple :
-Entrée brute :
-#N1225.1(Q♠K♦A♣) ✅ (autre info)
-#N1236.1(3♥7♦A♣) - 🔵#R(test)
-→ Résultat attendu :
-A♠
-#N1225.1(Q♠K♦A♣)
-#N1236.1(3♥7♦A♣)
-K♦
-#N1225.1(Q♠K♦A♣)
+Exemple pour t’inspirer :
 
-Données à traiter :
-${input}
+Données brutes :
+✅ #N1.2(A♠️,10♦️,K♦️)(extra)
+- #N2.1(4♣️,J♦️,J♥️)(bonus)
+🔵#R #N3.3(3♥️,7♦️,A♣️)(autre)
+#T12 #N4.2(7♣️,10♥️)(reste)
+
+Résultat attendu :
+A♠
+#N1.2(A♠️,10♦️,K♦️)
+
+K♦
+#N1.2(A♠️,10♦️,K♦️)
+
+10♦
+#N1.2(A♠️,10♦️,K♦️)
+
+J♦
+#N2.1(4♣️,J♦️,J♥️)
+
+J♥
+#N2.1(4♣️,J♦️,J♥️)
+
+4♣
+#N2.1(4♣️,J♦️,J♥️)
+
+3♥
+#N3.3(3♥️,7♦️,A♣️)
+
+7♦
+#N3.3(3♥️,7♦️,A♣️)
+
+A♣
+#N3.3(3♥️,7♦️,A♣️)
+
+7♣
+#N4.2(7♣️,10♥️)
+
+10♥
+#N4.2(7♣️,10♥️)
+
+Maintenant fais la même chose avec mes données :
       `;
 
       try {
-        const response = await fetch("/process", {
+        const res = await fetch("/ask", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: consigne })
+          body: JSON.stringify({ data: input, question })
         });
 
-        const data = await response.json();
-
-        if (data.success) {
-          resultatDiv.innerHTML = colorizeCards(data.result);
+        const json = await res.json();
+        if (json.success) {
+          resultDiv.textContent = json.result;
         } else {
-          resultatDiv.innerHTML = "❌ Erreur : " + data.error;
+          resultDiv.textContent = "Erreur : " + json.error;
         }
       } catch (err) {
-        resultatDiv.innerHTML = "⚠️ Erreur réseau : " + err.message;
+        resultDiv.textContent = "Erreur : " + err.message;
       }
     }
   </script>
