@@ -1,7 +1,7 @@
 {
-  "name": "cartes-ai",
+  "name": "cartes-site",
   "version": "1.0.0",
-  "description": "Processeur de cartes + OpenAI",
+  "description": "Processeur de cartes + IA Kouamé",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
