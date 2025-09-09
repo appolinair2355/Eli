@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Kouamé AI</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;max-width:700px;margin:0 auto;padding:20px;background:#f5f5f5}
+    input[type=text]{width:70%;padding:10px;border:1px solid #ddd;border-radius:5px;font-size:16px}
+    button{background:#007bff;color:#fff;padding:10px 20px;border:none;border-radius:5px;cursor:pointer;font-size:16px;margin-left:8px}
+    button:hover{background:#0056b3}
+    #aiReply{margin-top:20px;padding:15px;background:#f8f9fa;border-radius:5px;white-space:pre-wrap;font-family:monospace}
+    .loader{color:#007bff;font-weight:bold}
+  </style>
+</head>
+<body>
+  <h1>ChatGPT pour Kouamé</h1>
+  <input id="question" type="text" placeholder="Posez votre question à Kouamé AI…" />
+  <button onclick="askAI()">Kouamé AI</button>
+  <div id="aiReply"></div>
+
+  <script>
+    async function askAI() {
+      const q = document.getElementById('question').value.trim();
+      const out = document.getElementById('aiReply');
+      if (!q) return;
+      out.innerHTML = '<span class="loader">Kouamé AI réfléchit…</span>';
+
+      const res = await fetch('/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: '', question: q })
+      });
+      out.textContent = '';
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        out.textContent += decoder.decode(value, { stream: true });
+      }
+    }
+  </script>
+</body>
+  </html>
+  
