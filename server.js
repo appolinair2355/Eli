@@ -1,96 +1,155 @@
-import express from "express";
-import bodyParser from "body-parser";
-import fetch from "node-fetch";
-import dotenv from "dotenv";
-
-dotenv.config();
+/* server.js – Render.com – port 10000 */
+require("dotenv").config();
+const express = require("express");
+const { OpenAI } = require("openai");
 
 const app = express();
-const port = process.env.PORT || 10000;
+const PORT = process.env.PORT || 10000;
 
-app.use(bodyParser.json());
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+app.use(express.json());
 app.use(express.static("public"));
 
-// Route Chat normal
+/* -------- ordre EXACT demandé (6 → A) -------- */
+const ORDER_6A = [
+  // ♠
+  "A♠","K♠","Q♠","J♠","10♠","9♠","8♠","7♠","6♠",
+  // ♦
+  "A♦","K♦","Q♦","J♦","10♦","9♦","8♦","7♦","6♦",
+  // ♣
+  "A♣","K♣","Q♣","J♣","10♣","9♣","8♣","7♣","6♣",
+  // ♥
+  "A♥","K♥","Q♥","J♥","10♥","9♥","8♥","7♥","6♥"
+];
+
+/* -------- normalisation -------- */
+function normalize(str = "") {
+  return String(str)
+    .replace(/\ufe0f/g, "")     // variation selector invisible
+    .replace(/T/gi, "10")       // T → 10
+    .replace(/1\D?0/g, "10")    // "1 0", "1-0" → 10
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/* -------- utilitaires -------- */
+const CARD_RE_6A = /(10|[6-9]|[AJQK])[♠♦♣♥]/g;
+
+function firstParenContent(line) {
+  const m = line.match(/\(([^)]*)\)/);
+  return m ? m[1] : "";
+}
+
+function extractNumTotal(line) {
+  const m = line.match(/#N?(\d+)\.(\d+)/);
+  return m ? { num: m[1], total: m[2] } : { num: "?", total: "?" };
+}
+
+/* -------- traitement déterministe pour “Analyse ces mains …” -------- */
+function analyzeHandsDeterministic(rawInput) {
+  const lines = String(rawInput).split(/\r?\n/).map(normalize).filter(Boolean);
+  const results = [];
+
+  for (const raw of lines) {
+    // 1) nettoyage : tags & normalisation
+    const clean = normalize(
+      raw.replace(/✅|🔵#R|#R|#T\d+|—|–| - | -|-|•/g, " ")
+    );
+
+    // 2) ne garder que la 1ʳᵉ parenthèse
+    const inside = normalize(firstParenContent(clean));
+    if (!inside) continue;
+
+    // 3) n’extraire que 6–10, J, Q, K, A
+    const cards = [...inside.matchAll(CARD_RE_6A)].map(m => m[0]);
+    if (!cards.length) continue;
+
+    // 4) ligne canonique pour sortie
+    const { num, total } = extractNumTotal(clean);
+    const lineOut = `#N${num}.${total}(${inside})`;
+
+    for (const key of cards) results.push({ key, line: lineOut });
+  }
+
+  if (!results.length) return "(Aucune main valide trouvée dans la 1ère parenthèse)";
+
+  // tri strict selon ORDER_6A
+  const normOrder = ORDER_6A.map(normalize);
+  results.sort((a, b) => normOrder.indexOf(normalize(a.key)) - normOrder.indexOf(normalize(b.key)));
+
+  // regroupement
+  const out = [];
+  let currentKey = null;
+  let bucket = new Set();
+
+  const flush = () => {
+    if (currentKey) {
+      out.push(currentKey);
+      for (const l of bucket) out.push(l);
+      out.push("");
+    }
+  };
+
+  for (const r of results) {
+    if (r.key !== currentKey) {
+      flush();
+      currentKey = r.key;
+      bucket = new Set();
+    }
+    bucket.add(r.line); // évite doublons
+  }
+  flush();
+
+  return out.join("\n").trim();
+}
+
+/* -------- routes -------- */
+
+// (Optionnel) on garde /process si tu veux tester l’algo depuis l’autre bouton
+app.post("/process", (req, res) => {
+  try {
+    const result = analyzeHandsDeterministic(req.body.data || "");
+    res.json({ success: true, result });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
 app.post("/ask", async (req, res) => {
-  try {
-    const { question } = req.body;
+  const { data, question } = req.body || {};
+  const q = normalize(question || "").toLowerCase();
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: "Tu es un assistant utile qui répond clairement en français." },
-          { role: "user", content: question }
-        ]
-      })
+  // 🚦 Cas déterministe : on bypass l’IA pour garantir l’ordre exact
+  if (q.startsWith("analyse ces mains")) {
+    try {
+      const text = analyzeHandsDeterministic(data || "");
+      return res.type("text/plain; charset=utf-8").send(text);
+    } catch (err) {
+      return res.status(500).type("text/plain").send("Erreur analyse: " + err.message);
+    }
+  }
+
+  // 🤖 Sinon, on passe par OpenAI (pour d’autres questions libres)
+  try {
+    const stream = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Tu es un assistant spécialisé dans l’analyse de mains de cartes. Réponds en français." },
+        { role: "user", content: `Mains :\n${data}\n\nQuestion : ${question}` }
+      ],
+      stream: true
     });
 
-    const data = await response.json();
-    res.json({ answer: data.choices[0].message.content });
-
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) res.write(delta);
+    }
+    res.end();
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Erreur serveur");
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Route Traitement des cartes
-app.post("/traiter", async (req, res) => {
-  try {
-    const { texte } = req.body;
-
-    const instruction = `
-Tu reçois du texte contenant des balises et des parenthèses. 
-Ta tâche est de :
-1. Supprimer toutes les balises (#N...) et les deuxièmes parenthèses.
-2. Garder les cartes sous forme valeur+symbole (ex: 5♣, 10♦, K♥).
-3. Classer les cartes par ordre croissant (2 → A).
-4. Afficher clairement les mains extraites puis la liste finale triée.
-
-Exemple :
-Entrée brute :
-#N1234.4(J♦5♣Q♥)
-
-Résultat attendu :
-Mains extraites :
-1. J♦, 5♣, Q♥
-
-Liste finale triée :
-- 5♣
-- J♦
-- Q♥
-`;
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: instruction },
-          { role: "user", content: texte }
-        ]
-      })
-    });
-
-    const data = await response.json();
-    res.json({ resultat: data.choices[0].message.content });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Erreur serveur");
-  }
-});
-
-app.listen(port, () => {
-  console.log(`✅ Serveur en ligne sur http://localhost:${port}`);
-});
+app.listen(PORT, () => console.log(`✅ Serveur démarré sur le port ${PORT}`));
