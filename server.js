@@ -26,9 +26,9 @@ const ORDER_6A = [
 /* -------- normalisation -------- */
 function normalize(str = "") {
   return String(str)
-    .replace(/\ufe0f/g, "")
-    .replace(/T/gi, "10")
-    .replace(/1\D?0/g, "10")
+    .replace(/\ufe0f/g, "")     // variation selector invisible
+    .replace(/T/gi, "10")       // T → 10
+    .replace(/1\D?0/g, "10")    // "1 0", "1-0" → 10
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -37,7 +37,7 @@ function normalize(str = "") {
 const CARD_RE_6A = /(10|[6-9]|[AJQK])[♠️♦️♣️❤️]/g;
 
 function firstParenContent(line) {
-  const m = line.match(/ $([^)]*)$/);   // ✅ CORRIGÉ
+  const m = line.match(/ $([^)]*)$/);   // ✅ regexp fixée
   return m ? m[1] : "";
 }
 
@@ -73,9 +73,7 @@ function analyzeHandsDeterministic(rawInput) {
   const out = [];
   let currentKey = null, bucket = new Set();
   const flush = () => {
-    if (currentKey) {
-      out.push(currentKey, ...bucket, "");
-    }
+    if (currentKey) { out.push(currentKey, ...bucket, ""); }
   };
   for (const r of results) {
     if (r.key !== currentKey) { flush(); currentKey = r.key; bucket = new Set(); }
@@ -127,4 +125,3 @@ app.post("/ask", async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`✅ Serveur démarré sur le port ${PORT}`));
-  
