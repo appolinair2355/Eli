@@ -149,6 +149,14 @@ Ensuite applique exactement la même logique sur mes données ci-dessous :`;
           if (done) break;
           resultDiv.textContent += decoder.decode(value, { stream: true });
         }
+
+        // 🔁 TRANSFORMATION FINALE des symboles
+        resultDiv.textContent = resultDiv.textContent
+          .replace(/♠/g, '♠️')
+          .replace(/♦/g, '♦️')
+          .replace(/♣/g, '♣️')
+          .replace(/♥/g, '❤️');
+
       } catch (err) {
         resultDiv.className = 'error';
         resultDiv.textContent = 'Erreur : ' + err.message;
