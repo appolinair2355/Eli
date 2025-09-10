@@ -1,6 +1,4 @@
- 
-
-* server.js – Render.com – port 10000 */
+/* server.js – Render.com – port 10000 */
 require("dotenv").config();
 const express = require("express");
 const { OpenAI } = require("openai");
