@@ -3,44 +3,198 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Kouamé AI</title>
+  <title>Kouamé AI – Générateur d’histoires</title>
   <style>
-    body{font-family:Arial,Helvetica,sans-serif;max-width:700px;margin:0 auto;padding:20px;background:#f5f5f5}
-    input[type=text]{width:70%;padding:10px;border:1px solid #ddd;border-radius:5px;font-size:16px}
-    button{background:#007bff;color:#fff;padding:10px 20px;border:none;border-radius:5px;cursor:pointer;font-size:16px;margin-left:8px}
-    button:hover{background:#0056b3}
-    #aiReply{margin-top:20px;padding:15px;background:#f8f9fa;border-radius:5px;white-space:pre-wrap;font-family:monospace}
-    .loader{color:#007bff;font-weight:bold}
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #121212;
+      color: #fff;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+
+    input {
+      background: #1f1f1f;
+      color: #fff;
+    }
+
+    textarea {
+      height: 180px;
+      background: #1f1f1f;
+      color: #fff;
+      resize: vertical;
+    }
+
+    .btn-row {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      background: #007bff;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      padding: 12px 18px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    #minWords {
+      width: 120px;
+      background: #1f1f1f;
+      color: #fff;
+    }
+
+    #result {
+      margin-top: 20px;
+      padding: 20px;
+      background: #1e1e1e;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+
+    .signature {
+      margin-top: 15px;
+      font-size: 14px;
+      color: #aaa;
+      text-align: right;
+    }
   </style>
 </head>
 <body>
-  <h1>ChatGPT pour Kouamé</h1>
-  <input id="question" type="text" placeholder="Posez votre question à Kouamé AI…" />
-  <button onclick="askAI()">Kouamé AI</button>
-  <div id="aiReply"></div>
+  <h1>📖 Générateur d’histoires – Kouamé AI</h1>
+
+  <!-- Ligne titre / épisode / auteur -->
+  <div class="form-row">
+    <input id="title" type="text" placeholder="Titre de l’histoire">
+    <input id="episode" type="number" placeholder="Épisode">
+    <input id="author" type="text" placeholder="Auteur">
+  </div>
+
+  <!-- Zone contenu -->
+  <textarea id="content" placeholder="Écrivez votre contenu ou consignes ici..."></textarea>
+
+  <!-- Ligne boutons -->
+  <div class="btn-row">
+    <button onclick="generateStory()">Ai Kouamé généré</button>
+    <input id="minWords" type="number" placeholder="N (mots min)">
+    <button onclick="nextEpisode()">Épisode suivant</button>
+    <button onclick="styleStory()">S</button>
+  </div>
+
+  <!-- Résultat -->
+  <div id="result"></div>
 
   <script>
-    async function askAI() {
-      const q = document.getElementById('question').value.trim();
-      const out = document.getElementById('aiReply');
-      if (!q) return;
-      out.innerHTML = '<span class="loader">Kouamé AI réfléchit…</span>';
+    const resultDiv = document.getElementById("result");
+    let lastStory = ""; // sauvegarde du dernier texte généré
 
-      const res = await fetch('/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: '', question: q })
+    async function generateStory() {
+      const title = document.getElementById("title").value.trim();
+      const episode = document.getElementById("episode").value.trim();
+      const author = document.getElementById("author").value.trim();
+      const content = document.getElementById("content").value.trim();
+      const minWords = document.getElementById("minWords").value.trim();
+
+      if (!title || !episode || !author) {
+        alert("Veuillez remplir Titre, Épisode et Auteur !");
+        return;
+      }
+
+      let prompt = `Titre : ${title}\nÉpisode ${episode}\nAuteur : ${author}\n\n`;
+      if (content.toLowerCase().includes("conclusion")) {
+        prompt += "⚠️ Génère la conclusion finale de l’histoire, avec morale.\n";
+      } else {
+        prompt += `Consignes / contenu : ${content}\n`;
+      }
+      if (minWords) {
+        prompt += `⚠️ Le texte doit contenir au minimum ${minWords} mots.\n`;
+      }
+
+      resultDiv.textContent = "⏳ Kouamé AI réfléchit…";
+
+      const res = await fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: "", question: prompt })
       });
-      out.textContent = '';
+
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
+      let story = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        out.textContent += decoder.decode(value, { stream: true });
+        story += decoder.decode(value, { stream: true });
+        resultDiv.textContent = story;
       }
+
+      lastStory = story;
+      resultDiv.innerHTML = `<h2>${title}</h2>
+        <h3>Épisode ${episode}</h3>
+        <p>${story}</p>
+        <div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
+    }
+
+    async function nextEpisode() {
+      const epInput = document.getElementById("episode");
+      epInput.value = parseInt(epInput.value || "0") + 1;
+      await generateStory();
+    }
+
+    async function styleStory() {
+      if (!lastStory) {
+        alert("Générez d’abord une histoire !");
+        return;
+      }
+
+      const stylePrompt = `Réécris ce texte avec un style plus vivant, ajoute des émotions et des emojis :\n${lastStory}`;
+      resultDiv.textContent = "✨ Application du style…";
+
+      const res = await fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: "", question: stylePrompt })
+      });
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let styled = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        styled += decoder.decode(value, { stream: true });
+        resultDiv.textContent = styled;
+      }
+
+      lastStory = styled;
     }
   </script>
 </body>
-  </html>
-  
+</html>
