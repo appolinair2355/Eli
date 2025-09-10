@@ -10,16 +10,19 @@
       max-width:800px;
       margin:0 auto;
       padding:20px;
-      background:#f5f5f5
+      background:#121212; /* fond sombre */
+      color:#ffffff;      /* texte blanc */
     }
     textarea{
       width:100%;
       height:200px;
       padding:10px;
-      border:1px solid #ddd;
+      border:1px solid #333;
       border-radius:5px;
       font-family:monospace;
-      resize:vertical
+      resize:vertical;
+      background:#1e1e1e; /* zone sombre */
+      color:#ffffff;
     }
     button{
       background:#007bff;
@@ -35,15 +38,16 @@
     #result{
       margin-top:20px;
       padding:15px;
-      background:#ffffff; /* fond blanc */
+      background:#1e1e1e; /* zone sombre */
       border-radius:5px;
       white-space:pre-wrap;
       font-family:monospace;
-      min-height:50px
+      min-height:50px;
+      color:#ffffff;
     }
     .loader{color:#007bff;font-weight:bold}
-    .success{background:#ffffff;color:inherit} /* fond blanc et vraies couleurs */
-    .error{color:red;background:#ffe6e6}
+    .success{background:#1e1e1e;color:#ffffff}
+    .error{color:red;background:#3a1a1a}
   </style>
 </head>
 <body>
@@ -66,19 +70,19 @@
       resultDiv.className = 'loader';
       resultDiv.textContent = 'Analyse en cours par Kouamé IA…';
 
-      // Question fixe avec exemple complet A → Z
+      // Question fixe avec exemple complet
       const question = `Analyse ces mains. 
 
 Règles à suivre :
 1. Supprime tous les tags (#T, ✅, 🔵#R, - etc.)  
 2. Ne garde que la première parenthèse de chaque ligne (ignore la deuxième s’il y en a)  
-3. Classe les cartes extraites selon cet ordre strict :  
+3. Classe les cartes extraites (valeur + symbole toujours collés, ex: A♠, 10♦, J♥) selon cet ordre strict :  
 A♠,K♠,Q♠,J♠,10♠,9♠,8♠,7♠,6♠,  
 A♦,K♦,Q♦,J♦,10♦,9♦,8♦,7♦,6♦,  
 A♣,K♣,Q♣,J♣,10♣,9♣,8♣,7♣,6♣,  
 A♥,K♥,Q♥,J♥,10♥,9♥,8♥,7♥,6♥  
 
-### Exemple complet : 
+### Exemple clair : 
 
 Données brutes :  
 #N1196. ✅8(A♦7♠) - 2(5♦7♣) #T10  
@@ -94,51 +98,34 @@ Données brutes :
 #N1199.8(A♠9♦8♦)  
 #N1200.0(10♣Q♣Q♥)
 
-Étape 2 : extraction des cartes 6–10, J, Q, K, A →  
+Étape 2 : extraction des cartes (valeur + symbole) →  
 - Ligne 1196 → A♦, 7♠  
 - Ligne 1197 → A♦, 8♠  
 - Ligne 1198 → 7♣, J♥  
 - Ligne 1199 → A♠, 9♦, 8♦  
 - Ligne 1200 → 10♣, Q♣, Q♥  
 
-Étape 3 : classement selon l’ordre défini →  
+Étape 3 : classement lisible selon l’ordre défini →  
 
-A♠  
-#N1199.8(A♠9♦8♦)  
+A♠ : #N1199.8(A♠9♦8♦)  
+K♠ : —  
+Q♠ : —  
+J♠ : —  
+10♠ : —  
+9♠ : #N1199.8(A♠9♦8♦)  
+8♠ : #N1197.9(A♦8♠)  
+7♠ : #N1196.8(A♦7♠)  
 
-9♠  
-#N1199.8(A♠9♦8♦)  
+A♦ : #N1196.8(A♦7♠), #N1197.9(A♦8♠)  
+9♦ : #N1199.8(A♠9♦8♦)  
+8♦ : #N1199.8(A♠9♦8♦)  
 
-8♠  
-#N1197.9(A♦8♠)  
+Q♣ : #N1200.0(10♣Q♣Q♥)  
+10♣ : #N1200.0(10♣Q♣Q♥)  
+7♣ : #N1198.7(7♣J♥)  
 
-7♠  
-#N1196.8(A♦7♠)  
-
-A♦  
-#N1196.8(A♦7♠)  
-#N1197.9(A♦8♠)  
-
-9♦  
-#N1199.8(A♠9♦8♦)  
-
-8♦  
-#N1199.8(A♠9♦8♦)  
-
-Q♣  
-#N1200.0(10♣Q♣Q♥)  
-
-10♣  
-#N1200.0(10♣Q♣Q♥)  
-
-7♣  
-#N1198.7(7♣J♥)  
-
-Q♥  
-#N1200.0(10♣Q♣Q♥)  
-
-J♥  
-#N1198.7(7♣J♥)  
+Q♥ : #N1200.0(10♣Q♣Q♥)  
+J♥ : #N1198.7(7♣J♥)  
 
 ---
 
@@ -151,7 +138,7 @@ Ensuite applique exactement la même logique sur mes données ci-dessous :`;
           body: JSON.stringify({ data: input, question })
         });
 
-        // lecture en flux (stream OpenAI)
+        // lecture en flux
         const reader = res.body.getReader();
         const decoder = new TextDecoder("utf-8");
         resultDiv.className = 'success';
