@@ -1,196 +1,183 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kouamé AI – Générateur d’Histoires</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Kouamé IA – Générateur d’histoire</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
-    h1 { color: #333; }
-    textarea, input { width: 100%; margin: 5px 0; padding: 10px; }
-    button { margin: 5px; padding: 10px 20px; cursor: pointer; }
-    #result { background: #fff; padding: 15px; margin-top: 20px; border-radius: 8px; min-height: 150px; }
-    .signature { margin-top: 15px; font-size: 0.9em; color: #666; }
-    #history { margin-top: 20px; }
-    .history-item { background: #eee; padding: 8px; margin: 5px 0; border-radius: 6px; cursor: pointer; }
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      width: 90%;
+      max-width: 900px;
+      margin: auto;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #ffffff;
+    }
+    textarea, input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 5px;
+      border: none;
+      background: #1e1e1e;
+      color: #ffffff;
+    }
+    button {
+      padding: 10px 15px;
+      margin: 10px 5px 0 0;
+      border: none;
+      border-radius: 5px;
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:disabled {
+      background-color: #555;
+      cursor: not-allowed;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #1e1e1e;
+      border-radius: 5px;
+      white-space: pre-line;
+      min-height: 150px;
+    }
+    .history {
+      margin-top: 30px;
+      padding: 15px;
+      background: #222;
+      border-radius: 5px;
+    }
+    .episode {
+      margin-bottom: 15px;
+      padding: 10px;
+      background: #333;
+      border-radius: 5px;
+    }
   </style>
 </head>
 <body>
-  <h1>📖 Kouamé AI – Générateur d’Histoires</h1>
+  <div class="container">
+    <h1>Kouamé IA – Générateur d’histoire</h1>
 
-  <label>Titre :</label>
-  <input id="title" type="text" placeholder="Titre de l’histoire">
+    <input id="title" placeholder="Titre de l’histoire"/>
+    <input id="wordCount" type="number" placeholder="Nombre de mots par épisode" value="300"/>
 
-  <label>Épisode :</label>
-  <input id="episode" type="number" value="1" min="1">
+    <textarea id="content" placeholder="Contenu initial (optionnel)"></textarea>
 
-  <label>Auteur :</label>
-  <input id="author" type="text" placeholder="Votre nom">
+    <div>
+      <button id="generate">🎬 Générer</button>
+      <button id="next" disabled>⏭️ Épisode suivant</button>
+      <button id="modify" disabled>✍️ Modifier</button>
+    </div>
 
-  <label>Résumé :</label>
-  <textarea id="summary" placeholder="Résumé de départ"></textarea>
+    <div class="result" id="result">Le texte généré apparaîtra ici...</div>
 
-  <label>Consignes :</label>
-  <textarea id="consignes" placeholder="Ex : plus de suspense, développe le dialogue..."></textarea>
-
-  <label>Nombre minimum de mots :</label>
-  <input id="minWords" type="number" value="400" min="100">
-
-  <div>
-    <button onclick="generateStory()">Générer</button>
-    <button onclick="nextEpisode()">Suivant</button>
-    <button onclick="modifyStory()">Modifier</button>
-    <button onclick="generateAllEpisodes()">Générer 15 épisodes auto</button>
+    <div class="history" id="history">
+      <h3>Historique des épisodes</h3>
+      <div id="episodes"></div>
+    </div>
   </div>
 
-  <div id="result"></div>
+  <script>
+    let currentEpisode = 0;
+    let story = [];
+    let locked = false;
 
-  <h2>📚 Historique</h2>
-  <div id="history"></div>
+    async function callAPI(action, extra = "") {
+      const title = document.getElementById("title").value;
+      const wordCount = document.getElementById("wordCount").value;
+      let content = document.getElementById("content").value;
 
-<script>
-let storyHistory = [];
-let lastStory = "";
-let verrouille = false;
+      let prompt = "";
+      if (action === "generate") {
+        prompt = `Crée le premier épisode d'une histoire intitulée "${title}". 
+                  Style narratif riche avec dialogues, actions, descriptions des lieux, portraits des personnages, proverbes, leçons de vie et poèmes d'amour. 
+                  Respecte ${wordCount} mots. 
+                  Commence l'histoire directement avec l'action. 
+                  Épisode 1 : ${content}`;
+      } else if (action === "next") {
+        prompt = `Continue l'histoire après l'épisode ${currentEpisode}. 
+                  Ne saute pas de temps ("le lendemain", "quelques jours après" interdits). 
+                  Force l'avancement naturel des événements avec dialogues, actions, descriptions détaillées. 
+                  Respecte ${wordCount} mots. 
+                  Épisode ${currentEpisode + 1} :`;
+      } else if (action === "modify") {
+        prompt = `Voici l'épisode à modifier : """${story[currentEpisode - 1]}""" 
+                  Consigne utilisateur : ${extra}. 
+                  Corrige uniquement ce texte : ajoute/remplace/insère où nécessaire sans réécrire tout l'épisode. 
+                  Respecte ${wordCount} mots. 
+                  Retourne le texte corrigé uniquement.`;
+      }
 
-// --- Génération normale ---
-async function generateStory() {    
-  const title = document.getElementById("title").value.trim();    
-  const episode = document.getElementById("episode").value.trim();    
-  const author = document.getElementById("author").value.trim();    
-  const summary = document.getElementById("summary").value.trim();    
-  const consignes = document.getElementById("consignes").value.trim();    
-  const minWords = document.getElementById("minWords").value.trim();    
+      const response = await fetch("http://localhost:5000/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await response.json();
+      return data.text;
+    }
 
-  if (!title || !episode || !author) { 
-    alert("Veuillez remplir Titre, Épisode et Auteur !"); 
-    return; 
-  }    
+    function updateResult(text) {
+      document.getElementById("result").innerText = text;
+    }
 
-  let context = `Titre : ${title}\nÉpisode ${episode}\nAuteur : ${author}\n\nRésumé initial : ${summary}\n\n`;    
+    function addToHistory(episodeNumber, text) {
+      const container = document.getElementById("episodes");
+      const div = document.createElement("div");
+      div.classList.add("episode");
+      div.innerHTML = `<strong>Épisode ${episodeNumber}</strong><br>${text}`;
+      container.appendChild(div);
+    }
 
-  if (storyHistory.length > 0) {    
-    context += `Texte complet des épisodes précédents :\n`;    
-    storyHistory.forEach(e => {    
-      context += `--- Épisode ${e.episode} ---\n${e.fullText}\n\n`;    
-    });    
-  }    
+    document.getElementById("generate").addEventListener("click", async () => {
+      if (locked) return;
+      const text = await callAPI("generate");
+      currentEpisode = 1;
+      story.push(text);
+      updateResult(text);
+      addToHistory(currentEpisode, text);
 
-  if (consignes) context += `Consignes pour cet épisode : ${consignes}\n`;    
-  if (minWords) context += `⚠️ Longueur stricte : minimum ${minWords} mots.\n`;    
+      // verrouille et vide
+      locked = true;
+      document.getElementById("result").innerText = "";
+      document.getElementById("content").value = "";
+      document.getElementById("generate").disabled = true;
+      document.getElementById("next").disabled = false;
+      document.getElementById("modify").disabled = false;
+    });
 
-  context += `
-⚠️ Règles de narration :
-- Chaque épisode doit ABSOLUMENT faire avancer l’histoire.
-- Dialogues vivants et naturels entre les personnages (avec "—" devant les répliques).
-- Actions dynamiques et descriptions détaillées des lieux.
-- Portraits physiques et psychologiques des personnages.
-- Intégrer des proverbes, des leçons de vie et parfois des poèmes d’amour.
-- Respect STRICT du nombre de mots demandé.
-- Ne pas écrire de titres ni de numéros d’épisode, seulement le récit.
-- Style narratif immersif, riche, fluide et captivant.
-`;
+    document.getElementById("next").addEventListener("click", async () => {
+      const text = await callAPI("next");
+      currentEpisode++;
+      story.push(text);
+      updateResult(text);
+      addToHistory(currentEpisode, text);
+      locked = true;
+      document.getElementById("result").innerText = "";
+    });
 
-  resultDiv.innerHTML = "<em>⏳ Kouamé AI écrit l’histoire…</em>";    
+    document.getElementById("modify").addEventListener("click", async () => {
+      const instruction = prompt("Que veux-tu modifier ? (ex: ajouter un poème à la fin, remplacer une phrase, etc.)");
+      if (!instruction) return;
+      const text = await callAPI("modify", instruction);
+      story[currentEpisode - 1] = text;
+      updateResult(text);
 
-  const res = await fetch("/ask", {    
-    method: "POST",    
-    headers: { "Content-Type": "application/json" },    
-    body: JSON.stringify({ data: "", question: context })    
-  });    
-
-  const reader = res.body.getReader();    
-  const decoder = new TextDecoder();    
-  let story = "";    
-
-  while (true) {    
-    const { done, value } = await reader.read();    
-    if (done) break;    
-    story += decoder.decode(value, { stream: true });    
-    resultDiv.textContent = story;    
-  }    
-
-  lastStory = story.trim();    
-
-  const finalContent = `
-    <h2>${title}</h2>
-    <h3>Épisode ${episode}</h3>
-    <div>${lastStory}</div>
-    <div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>
-  `;    
-
-  resultDiv.innerHTML = finalContent;    
-
-  storyHistory.push({ 
-    title, 
-    episode, 
-    preview: lastStory.slice(0,100)+"...", 
-    content: finalContent, 
-    fullText: lastStory 
-  });    
-
-  renderHistory(); 
-
-  // --- ⚠️ Vider & verrouiller après le premier épisode uniquement ---
-  if (episode === "1") {
-    setTimeout(() => {
-      resultDiv.innerHTML = "<em>Épisode 1 généré. Cliquez sur 'Suivant' pour continuer l’histoire.</em>";
-      verrouille = true;
-    }, 3000);
-  }
-}
-
-// --- Passer à l’épisode suivant ---
-function nextEpisode() {
-  if (!verrouille && storyHistory.length === 0) {
-    alert("Générez d’abord le premier épisode !");
-    return;
-  }
-  let ep = parseInt(document.getElementById("episode").value);
-  document.getElementById("episode").value = ep + 1;
-  verrouille = false;
-  generateStory();
-}
-
-// --- Modification d’un épisode ---
-function modifyStory() {
-  if (!lastStory) {
-    alert("Aucun texte à modifier !");
-    return;
-  }
-  const newConsignes = prompt("Entrez vos instructions pour modifier cet épisode :");
-  if (!newConsignes) return;
-
-  document.getElementById("consignes").value = newConsignes;
-  generateStory();
-}
-
-// --- Générer 15 épisodes d’un coup ---
-async function generateAllEpisodes() {
-  let totalEpisodes = 15;
-  let minWords = document.getElementById("minWords").value.trim();
-  for (let i = 1; i <= totalEpisodes; i++) {
-    document.getElementById("episode").value = i;
-    await generateStory();
-    await new Promise(r => setTimeout(r, 4000));
-  }
-}
-
-// --- Historique ---
-function renderHistory() {
-  const historyDiv = document.getElementById("history");
-  historyDiv.innerHTML = "";
-  storyHistory.forEach(item => {
-    const div = document.createElement("div");
-    div.className = "history-item";
-    div.textContent = `Épisode ${item.episode} : ${item.preview}`;
-    div.onclick = () => {
-      document.getElementById("result").innerHTML = item.content;
-      lastStory = item.fullText;
-    };
-    historyDiv.appendChild(div);
-  });
-}
-</script>
+      const episodesDiv = document.getElementById("episodes");
+      episodesDiv.lastChild.innerHTML = `<strong>Épisode ${currentEpisode}</strong><br>${text}`;
+    });
+  </script>
 </body>
-</html>
+  </html>
