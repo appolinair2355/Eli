@@ -137,6 +137,11 @@
         storyHistory.forEach(e => {
           context += `--- Épisode ${e.episode} ---\n${e.fullText}\n\n`;
         });
+
+        // Forcer reprise de la dernière phrase
+        const lastEp = storyHistory[storyHistory.length - 1];
+        const lastSentence = lastEp.fullText.trim().split(/[.!?]/).filter(Boolean).pop().trim();
+        context += `⚠️ Le nouvel épisode doit commencer par exactement cette phrase : "${lastSentence}".\n\n`;
       }
 
       if (consignes) {
@@ -148,9 +153,10 @@
       if (minWords) context += `⚠️ Minimum ${minWords} mots.\n`;
 
       context += `
+⚠️ Ne commence jamais un épisode par : "Le lendemain", "Deux mois plus tard", "De l’autre côté de la ville", etc.
+⚠️ Le contenu doit obligatoirement contenir : dialogues réalistes entre personnages, actions, proverbes, poèmes, ou une leçon tirée de la Bible ou d’un autre livre.
 ⚠️ Ne réécris pas le titre ni le numéro d’épisode.
 ⚠️ Respecte le titre "${title}".
-⚠️ Continue logiquement l’histoire, fais évoluer les personnages et événements.
 ⚠️ Style narratif fluide avec émotions, dialogues, emojis, gras et italique.
 `;
 
@@ -208,9 +214,11 @@ ${lastStory}
 
 Consignes de modification : "${consignes}".
 
-⚠️ Applique uniquement ces changements.
-⚠️ Ne modifie rien d’autre.
+⚠️ Applique uniquement ces changements (ajout, suppression ou modification de phrases/événements).
 ⚠️ Ne rajoute pas de titre ni numéro d’épisode.
+⚠️ Ne commence jamais un épisode par : "Le lendemain", "Deux mois plus tard", "De l’autre côté de la ville", etc.
+⚠️ Chaque épisode (sauf le premier) doit commencer par exactement la dernière phrase de l’épisode précédent.
+⚠️ Le texte doit contenir dialogues, actions, proverbes, poèmes ou leçons bibliques/littéraires.
 `;
 
       resultDiv.textContent = "✏️ Application des modifications…";
@@ -295,4 +303,4 @@ Consignes de modification : "${consignes}".
     }
   </script>
 </body>
-</html>
+  </html>
