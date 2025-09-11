@@ -17,7 +17,7 @@
     .btn-row { margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
     button { background: #007bff; border: none; border-radius: 6px; color: white; padding: 12px 18px; font-size: 16px; cursor: pointer; }
     button:hover { background: #0056b3; }
-    #minWords { width: 120px; background: #1f1f1f; color: #fff; }
+    #minWords, #numEpisodes { width: 140px; background: #1f1f1f; color: #fff; }
     #result { margin-top: 20px; padding: 20px; background: #1e1e1e; border-radius: 8px; line-height: 1.6; }
     #result h2, #result h3 { color: #00bfff; }
     #result strong { color: #ffcc00; }
@@ -32,6 +32,8 @@
     #exportBtn:hover { background: #1e7e34; }
     .btn-modify { background: #ffc107; color: #000; }
     .btn-modify:hover { background: #e0a800; }
+    .btn-full { background: #6f42c1; }
+    .btn-full:hover { background: #563d7c; }
   </style>
 </head>
 <body>
@@ -55,10 +57,12 @@
   <!-- Ligne boutons -->
   <div class="btn-row">
     <button onclick="generateStory()">Ai Kouamé généré</button>
-    <input id="minWords" type="number" placeholder="N (mots min)">
+    <input id="minWords" type="number" placeholder="Mots min/épisode">
+    <input id="numEpisodes" type="number" placeholder="Nb épisodes (15-20)">
     <button onclick="nextEpisode()">Épisode suivant</button>
     <button onclick="editEpisode()" class="btn-modify">✏️ Modifier épisode</button>
     <button onclick="styleStory()">S</button>
+    <button onclick="generateFullStory()" class="btn-full">📖 Histoire complète</button>
     <button onclick="resetStory()" style="background:#dc3545;">🔄 Réinitialiser</button>
   </div>
 
@@ -121,11 +125,11 @@
     // ---------- Génération ----------
     async function generateStory() {
       const title = document.getElementById("title").value.trim();
-      const episode = document.getElementById("episode").value.trim();
+      const episode = parseInt(document.getElementById("episode").value.trim() || "1");
       const author = document.getElementById("author").value.trim();
       const summary = document.getElementById("summary").value.trim();
       const consignes = document.getElementById("consignes").value.trim();
-      const minWords = document.getElementById("minWords").value.trim();
+      const minWords = parseInt(document.getElementById("minWords").value.trim() || "0");
 
       if (!title || !episode || !author) { alert("Veuillez remplir Titre, Épisode et Auteur !"); return; }
 
@@ -145,7 +149,7 @@
         context += "⚠️ Continue naturellement l’histoire avec cohérence et évolution des événements.\n";
       }
 
-      if (minWords) context += `⚠️ Minimum ${minWords} mots.\n`;
+      if (minWords > 0) context += `⚠️ Minimum ${minWords} mots.\n`;
 
       context += `
 ⚠️ Ne réécris pas le titre ni le numéro d’épisode.
@@ -191,7 +195,7 @@
       const consignes = document.getElementById("consignes").value.trim();
       if (!consignes) { alert("Écrivez vos consignes de modification !"); return; }
       const title = document.getElementById("title").value.trim();
-      const episode = document.getElementById("episode").value.trim();
+      const episode = parseInt(document.getElementById("episode").value.trim() || "1");
       const author = document.getElementById("author").value.trim();
 
       const editPrompt = `
@@ -240,9 +244,63 @@ Consignes de modification : "${consignes}".
       const reader = res.body.getReader(); const decoder = new TextDecoder(); let styled = "";
       while (true) { const {done, value} = await reader.read(); if (done) break; styled += decoder.decode(value,{stream:true}); resultDiv.textContent = styled; }
       lastStory = styled;
-      const episode = document.getElementById("episode").value.trim(); const title = document.getElementById("title").value.trim(); const author = document.getElementById("author").value.trim();
+      const episode = parseInt(document.getElementById("episode").value.trim() || "1");
+      const title = document.getElementById("title").value.trim(); 
+      const author = document.getElementById("author").value.trim();
       const existing = storyHistory.find(ep => ep.episode === episode);
       if (existing) { existing.fullText = styled; existing.preview = styled.slice(0,100)+"..."; existing.content = `<h2>${title}</h2><h3>Épisode ${episode}</h3><div>${styled}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`; resultDiv.innerHTML = existing.content; }
+      renderHistory(); saveData();
+    }
+
+    // ---------- Générer toute l’histoire ----------
+    async function generateFullStory() {
+      const title = document.getElementById("title").value.trim();
+      const author = document.getElementById("author").value.trim();
+      const summary = document.getElementById("summary").value.trim();
+      let numEpisodes = parseInt(document.getElementById("numEpisodes").value.trim() || "15");
+      const minWords = parseInt(document.getElementById("minWords").value.trim() || "200");
+
+      if (!title || !author) {
+        alert("Veuillez remplir Titre et Auteur !");
+        return;
+      }
+      if (numEpisodes < 15) numEpisodes = 15;
+      if (numEpisodes > 20) numEpisodes = 20;
+
+      let context = `
+Titre : ${title}
+Auteur : ${author}
+Résumé : ${summary}
+
+⚠️ Raconte une histoire complète en ${numEpisodes} épisodes.
+⚠️ Chaque épisode doit avoir au moins ${minWords} mots.
+⚠️ Sépare clairement chaque épisode par "Épisode X".
+⚠️ Conclus par une morale à la fin.
+⚠️ Style fluide avec dialogues, émotions, emojis, gras et italique.
+`;
+
+      resultDiv.textContent = "⏳ Kouamé AI écrit toute l’histoire…";
+
+      const res = await fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: "", question: context })
+      });
+
+      const text = await res.text();
+      lastStory = text;
+
+      const fullContent = `<h2>${title}</h2><h3>Histoire complète (${numEpisodes} épisodes)</h3><div>${text}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
+      resultDiv.innerHTML = fullContent;
+
+      storyHistory.push({
+        title,
+        episode: "Complet",
+        preview: text.slice(0,100)+"...",
+        content: fullContent,
+        fullText: text
+      });
+
       renderHistory(); saveData();
     }
 
@@ -258,15 +316,17 @@ Consignes de modification : "${consignes}".
     async function exportPDF() {
       if (storyHistory.length===0) { alert("Aucune histoire à exporter !"); return; }
       const { jsPDF } = window.jspdf; const doc = new jsPDF(); let y=30;
-      const title=document.getElementById("title").value||"Mon Histoire"; const author=document.getElementById("author").value||"Inconnu"; const summary=document.getElementById("summary").value||"Pas de résumé";
+      const title=document.getElementById("title").value||"Mon Histoire"; 
+      const author=document.getElementById("author").value||"Inconnu"; 
+      const summary=document.getElementById("summary").value||"Pas de résumé";
       doc.setFontSize(24); doc.setTextColor(30,144,255); doc.text(title,105,y,{align:"center"}); y+=20;
       doc.setFontSize(16); doc.setTextColor(0,0,0); doc.text("Auteur : "+author,105,y,{align:"center"}); y+=20;
       doc.setFontSize(14); doc.setTextColor(80,80,80); const summaryLines=doc.splitTextToSize("Résumé : "+summary,170); doc.text(summaryLines,20,y); doc.addPage();
       y=20;
-      storyHistory.forEach((ep)=>{ doc.setFontSize(16); doc.setTextColor(255,69,0); doc.text(`Épisode ${ep.episode}`,20,y); y+=10; doc.setFontSize(12); doc.setTextColor(0,0,0); const lines=doc.splitTextToSize(ep.fullText,170); lines.forEach(line=>{ if(y>270){doc.addPage(); y=20;} doc.text(line,20,y,{align:"justify"}); y+=7; }); y+=10; });
-      doc.setFontSize(10); doc.setTextColor(100,100,100); doc.text("Développeur : Sossou Kouamé",105,290,{align:"center"});
-      doc.save(`${title}.pdf`);
-    }
-  </script>
-</body>
-</html>
+      storyHistory.forEach((ep)=>{ 
+        doc.setFontSize(16); doc.setTextColor(255,69,0); 
+        doc.text(`Épisode ${ep.episode}`,20,y); 
+        y+=10; 
+        doc.setFontSize(12); doc.setTextColor(0,0,0); 
+        const lines=doc.splitTextToSize(ep.fullText,170); 
+        lines.forEach(line=>{ if(y>270){doc.addPage(); y=20;} doc.text
