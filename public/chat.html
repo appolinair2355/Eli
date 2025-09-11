@@ -8,6 +8,21 @@
   <style>
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 20px; background: #121212; color: #fff; }
     h1 { text-align: center; margin-bottom: 20px; }
+
+    /* Overlay licence */
+    .overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 1000;
+    }
+    .popup {
+      background: white; padding: 30px; border-radius: 10px; max-width: 400px; width: 90%;
+      text-align: center; color: black; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .popup input { width: 100%; padding: 12px; font-size: 16px; margin-top: 10px; border: 1px solid #ccc; border-radius: 6px; }
+    .popup button { margin-top: 15px; padding: 12px 20px; font-size: 16px; background: #007bff; border: none; border-radius: 6px; color: white; cursor: pointer; }
+    .popup button:hover { background: #0056b3; }
+    .hidden { display: none; }
+
     .form-row { display: flex; gap: 10px; margin-bottom: 15px; }
     input, textarea { width: 100%; padding: 10px; border: none; border-radius: 6px; font-size: 16px; }
     input { background: #1f1f1f; color: #fff; }
@@ -32,39 +47,43 @@
     #exportBtn:hover { background: #1e7e34; }
     .btn-modify { background: #ffc107; color: #000; }
     .btn-modify:hover { background: #e0a800; }
-    #license-screen { text-align: center; margin-top: 100px; }
-    #generator { display: none; }
   </style>
 </head>
 <body>
-  <!-- 🔒 Écran licence -->
-  <div id="license-screen">
-    <h1>🔑 Licence requise</h1>
-    <p>Veuillez entrer votre licence pour accéder au générateur :</p>
-    <input id="licenseInput" type="text" placeholder="Entrez votre licence" style="padding:10px;width:80%;max-width:400px;text-align:center;">
-    <br><br>
-    <button onclick="checkLicense()">Valider la licence</button>
-    <p id="licenseMessage" style="color:red;margin-top:15px;"></p>
+
+  <!-- Fenêtre de licence -->
+  <div class="overlay" id="licenceOverlay">
+    <div class="popup">
+      <h2>🔑 Saisissez votre licence</h2>
+      <input type="text" id="licenceInput" placeholder="Collez votre licence ici"/>
+      <button onclick="checkLicence()">Valider</button>
+      <p id="licenceMessage" style="color:red; font-size:14px; margin-top:10px;"></p>
+    </div>
   </div>
 
-  <!-- 🎯 Générateur (caché tant que pas de licence valide) -->
-  <div id="generator">
+  <!-- Contenu principal (masqué tant que licence non validée) -->
+  <div id="editor" class="hidden">
+
     <h1>📖 Générateur d’histoires – Kouamé AI</h1>
 
+    <!-- Ligne titre / épisode / auteur -->
     <div class="form-row">
       <input id="title" type="text" placeholder="Titre de l’histoire">
       <input id="episode" type="number" placeholder="Épisode">
       <input id="author" type="text" placeholder="Auteur">
     </div>
 
-    <label for="summary">Résumé de base (présentation des personnages et contexte) :</label>
+    <!-- Résumé initial -->
+    <label for="summary">Résumé de base :</label>
     <textarea id="summary" placeholder="Décrivez vos personnages, univers et contexte de départ..."></textarea>
 
+    <!-- Zone de consignes -->
     <label for="consignes">Consignes / Modifications :</label>
-    <textarea id="consignes" placeholder="Laissez vide pour que l’IA continue seule, ou écrivez vos consignes ici..."></textarea>
+    <textarea id="consignes" placeholder="Consignes pour l’IA..."></textarea>
 
+    <!-- Ligne boutons -->
     <div class="btn-row">
-      <button onclick="generateStory()">Créer Histoire par IA de Kouamé</button>
+      <button onclick="generateStory()">Ai Kouamé généré</button>
       <input id="minWords" type="number" placeholder="N (mots min)">
       <button onclick="nextEpisode()">Épisode suivant</button>
       <button onclick="editEpisode()" class="btn-modify">✏️ Modifier épisode</button>
@@ -72,50 +91,57 @@
       <button onclick="resetStory()" style="background:#dc3545;">🔄 Réinitialiser</button>
     </div>
 
+    <!-- Résultat -->
     <div id="result"></div>
 
+    <!-- Historique -->
     <div id="history">
       <h2>📚 Historique des épisodes</h2>
       <ul id="historyList"></ul>
       <button id="exportBtn" onclick="exportPDF()">📥 Exporter en PDF</button>
     </div>
+
   </div>
 
   <script>
-    // ---------------- LICENCE ----------------
-    async function checkLicense() {
-      const license = document.getElementById("licenseInput").value.trim();
-      if (!license) {
-        document.getElementById("licenseMessage").textContent = "Veuillez entrer une licence.";
+    /* ---------------- Vérification de licence ---------------- */
+    async function checkLicence() {
+      const licence = document.getElementById("licenceInput").value.trim();
+      const msg = document.getElementById("licenceMessage");
+
+      if (!licence) {
+        msg.textContent = "Veuillez entrer une licence.";
         return;
       }
 
       try {
-        const res = await fetch("/license/use", {
+        const res = await fetch("/api/check-licence", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: license })
+          body: JSON.stringify({ licence })
         });
         const data = await res.json();
 
-        if (data.success) {
-          // licence valide → déverrouiller le générateur
-          document.getElementById("license-screen").style.display = "none";
-          document.getElementById("generator").style.display = "block";
+        if (data.valid) {
+          msg.style.color = "green";
+          msg.textContent = "✅ Licence activée. Accès autorisé.";
+          document.getElementById("licenceOverlay").classList.add("hidden");
+          document.getElementById("editor").classList.remove("hidden");
         } else {
-          document.getElementById("licenseMessage").textContent =
-            "Licence invalide ou déjà utilisée. Payer une licence chez Sossou Kouamé Appolinaire WhatsApp: +2290167924076";
+          msg.style.color = "red";
+          msg.textContent = "❌ " + data.message + "\nVeuillez acheter une licence chez Sossou Kouamé Appolinaire WhatsApp: +2290167924076";
         }
       } catch (err) {
-        document.getElementById("licenseMessage").textContent = "Erreur serveur: " + err.message;
+        msg.style.color = "red";
+        msg.textContent = "Erreur de connexion au serveur.";
       }
     }
 
-    // ---------------- HISTOIRES (ton ancien code) ----------------
+    /* ---------------- Code EXISTANT (histoire, PDF, etc.) ---------------- */
     const resultDiv = document.getElementById("result");
     const historyList = document.getElementById("historyList");
-    let lastStory = ""; 
-    let storyHistory = []; 
+    let lastStory = "";
+    let storyHistory = [];
 
     function saveData() {
       const data = {
@@ -174,18 +200,15 @@
         });
       }
 
-      if (consignes) {
-        context += `Consignes pour cet épisode : ${consignes}\n`;
-      } else {
-        context += "⚠️ Continue naturellement l’histoire avec cohérence et évolution des événements.\n";
-      }
+      if (consignes) context += `Consignes : ${consignes}\n`;
+      else context += "⚠️ Continue naturellement l’histoire.\n";
 
       if (minWords) context += `⚠️ Minimum ${minWords} mots.\n`;
 
       context += `
 ⚠️ Ne réécris pas le titre ni le numéro d’épisode.
 ⚠️ Respecte le titre "${title}".
-⚠️ Continue logiquement l’histoire, fais évoluer les personnages et événements.
+⚠️ Continue logiquement l’histoire.
 ⚠️ Style narratif fluide avec émotions, dialogues, emojis, gras et italique.
 `;
 
@@ -212,6 +235,7 @@
       resultDiv.innerHTML = fullContent;
 
       storyHistory.push({ title, episode, preview: story.slice(0,100)+"...", content: fullContent, fullText: story });
+
       renderHistory(); saveData();
       document.getElementById("consignes").value = "";
     }
@@ -219,21 +243,12 @@
     async function editEpisode() {
       if (!lastStory) { alert("Aucun épisode à modifier !"); return; }
       const consignes = document.getElementById("consignes").value.trim();
-      if (!consignes) { alert("Écrivez vos consignes de modification !"); return; }
+      if (!consignes) { alert("Écrivez vos consignes !"); return; }
       const title = document.getElementById("title").value.trim();
       const episode = document.getElementById("episode").value.trim();
       const author = document.getElementById("author").value.trim();
 
-      const editPrompt = `
-Voici le texte original de l’épisode ${episode} de l’histoire "${title}" :
-
-${lastStory}
-
-Consignes de modification : "${consignes}".
-⚠️ Applique uniquement ces changements.
-⚠️ Ne modifie rien d’autre.
-⚠️ Ne rajoute pas de titre ni numéro d’épisode.
-`;
+      const editPrompt = `Voici l’épisode ${episode} de "${title}" :\n${lastStory}\nConsignes : "${consignes}".`;
 
       resultDiv.textContent = "✏️ Application des modifications…";
 
@@ -253,15 +268,15 @@ Consignes de modification : "${consignes}".
       document.getElementById("consignes").value = "";
     }
 
-    async function nextEpisode() { 
-      const epInput = document.getElementById("episode"); 
-      epInput.value = parseInt(epInput.value||"0")+1; 
-      await generateStory(); 
+    async function nextEpisode() {
+      const epInput = document.getElementById("episode");
+      epInput.value = parseInt(epInput.value||"0")+1;
+      await generateStory();
     }
 
     async function styleStory() {
       if (!lastStory) { alert("Générez d’abord une histoire !"); return; }
-      const stylePrompt = `Réécris ce texte avec style (gras, italique, emojis), sans changer le sens ni rajouter titre ou numéro :\n${lastStory}`;
+      const stylePrompt = `Réécris ce texte avec style (gras, italique, emojis), sans changer le sens :\n${lastStory}`;
       resultDiv.textContent = "✨ Application du style…";
       const res = await fetch("/ask",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ data:"", question:stylePrompt }) });
       const reader = res.body.getReader(); const decoder = new TextDecoder(); let styled = "";
@@ -289,9 +304,4 @@ Consignes de modification : "${consignes}".
       doc.setFontSize(14); doc.setTextColor(80,80,80); const summaryLines=doc.splitTextToSize("Résumé : "+summary,170); doc.text(summaryLines,20,y); doc.addPage();
       y=20;
       storyHistory.forEach((ep)=>{ doc.setFontSize(16); doc.setTextColor(255,69,0); doc.text(`Épisode ${ep.episode}`,20,y); y+=10; doc.setFontSize(12); doc.setTextColor(0,0,0); const lines=doc.splitTextToSize(ep.fullText,170); lines.forEach(line=>{ if(y>270){doc.addPage(); y=20;} doc.text(line,20,y,{align:"justify"}); y+=7; }); y+=10; });
-      doc.setFontSize(10); doc.setTextColor(100,100,100); doc.text("Développeur : Sossou Kouamé",105,290,{align:"center"});
-      doc.save(`${title}.pdf`);
-    }
-  </script>
-</body>
-</html>
+      doc.setFontSize(10); doc.setTextColor(100,100,100); doc.text("Développeur : Sossou Kou
