@@ -1,105 +1,17 @@
-/* server.js – Render.com – port 10000 */
-require("dotenv").config();
 const express = require("express");
-const { OpenAI } = require("openai");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
-const PORT = process.env.PORT || 10000;
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static("public")); // chat.html, cle.html
 
-/* -------- ordre EXACT demandé (6 → A) -------- */
-const ORDER_6A = [
-  // ♠
-  "A♠","K♠","Q♠","J♠","10♠","9♠","8♠","7♠","6♠",
-  // ♦
-  "A♦","K♦","Q♦","J♦","10♦","9♦","8♦","7♦","6♦",
-  // ♣
-  "A♣","K♣","Q♣","J♣","10♣","9♣","8♣","7♣","6♣",
-  // ♥
-  "A♥","K♥","Q♥","J♥","10♥","9♥","8♥","7♥","6♥"
-];
+const LICENCES_FILE = path.join(__dirname, "licences.json");
 
-/* -------- normalisation -------- */
-function normalize(str = "") {
-  return String(str)
-    .replace(/\ufe0f/g, "")     // variation selector invisible
-    .replace(/T/gi, "10")       // T → 10
-    .replace(/1\D?0/g, "10")    // "1 0", "1-0" → 10
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/* -------- utilitaires -------- */
-const CARD_RE_6A = /(10|[6-9]|[AJQK])[♠♦♣♥]/g;
-
-function firstParenContent(line) {
-  const m = line.match(/\(([^)]*)\)/);
-  return m ? m[1] : "";
-}
-
-function extractNumTotal(line) {
-  const m = line.match(/#N?(\d+)\.(\d+)/);
-  return m ? { num: m[1], total: m[2] } : { num: "?", total: "?" };
-}
-
-/* -------- traitement déterministe pour “Analyse ces mains …” -------- */
-function analyzeHandsDeterministic(rawInput) {
-  const lines = String(rawInput).split(/\r?\n/).map(normalize).filter(Boolean);
-  const results = [];
-
-  for (const raw of lines) {
-    const clean = normalize(
-      raw.replace(/✅|🔵#R|#R|#T\d+|—|–| - | -|-|•/g, " ")
-    );
-    const inside = normalize(firstParenContent(clean));
-    if (!inside) continue;
-
-    const cards = [...inside.matchAll(CARD_RE_6A)].map(m => m[0]);
-    if (!cards.length) continue;
-
-    const { num, total } = extractNumTotal(clean);
-    const lineOut = `#N${num}.${total}(${inside})`;
-
-    for (const key of cards) results.push({ key, line: lineOut });
-  }
-
-  if (!results.length) return "(Aucune main valide trouvée dans la 1ère parenthèse)";
-
-  const normOrder = ORDER_6A.map(normalize);
-  results.sort((a, b) => normOrder.indexOf(normalize(a.key)) - normOrder.indexOf(normalize(b.key)));
-
-  const out = [];
-  let currentKey = null;
-  let bucket = new Set();
-
-  const flush = () => {
-    if (currentKey) {
-      out.push(currentKey);
-      for (const l of bucket) out.push(l);
-      out.push("");
-    }
-  };
-
-  for (const r of results) {
-    if (r.key !== currentKey) {
-      flush();
-      currentKey = r.key;
-      bucket = new Set();
-    }
-    bucket.add(r.line);
-  }
-  flush();
-
-  return out.join("\n").trim();
-}
-
-/* -------- gestion licences -------- */
-const licenses = {};
-const categories = {
+// Durée des catégories en millisecondes
+const DURATIONS = {
   "10min": 10 * 60 * 1000,
   "30min": 30 * 60 * 1000,
   "1h": 60 * 60 * 1000,
@@ -108,98 +20,92 @@ const categories = {
   "48h": 48 * 60 * 60 * 1000
 };
 
-function randomLetters(len) {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+// Charger licences
+function loadLicences() {
+  if (!fs.existsSync(LICENCES_FILE)) return { licences: [] };
+  return JSON.parse(fs.readFileSync(LICENCES_FILE, "utf-8"));
 }
 
-function generateLicense(category, durationMs) {
-  const now = new Date();
-  const hour = now.getHours();
-  const base = hour + "2025" + (Math.random() < 0.5 ? String.fromCharCode(65 + Math.floor(Math.random() * 26)) : Math.floor(Math.random() * 9));
-  return base + randomLetters(3) + "Sossoufi#@" + randomLetters(6);
+// Sauvegarder licences
+function saveLicences(data) {
+  fs.writeFileSync(LICENCES_FILE, JSON.stringify(data, null, 2));
 }
 
-// Initialisation des licences
-for (const [cat, duration] of Object.entries(categories)) {
-  for (let i = 0; i < 10; i++) {
-    const code = generateLicense(cat, duration);
-    licenses[code] = { category: cat, used: false, expiresAt: null, duration };
-  }
+// Générer une nouvelle licence aléatoire
+function generateLicence(category) {
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const random3 = Array.from({ length: 3 }, () => letters[Math.floor(Math.random() * letters.length)]).join("");
+  const random6 = Array.from({ length: 6 }, () => letters[Math.floor(Math.random() * letters.length)]).join("");
+  const hour = new Date().getHours();
+  return `${hour}2025${random3}Sossoufi#@${random6}`;
 }
 
-/* -------- routes -------- */
+// Vérifier les expirations → remplacer par nouvelles
+function checkExpirations() {
+  const data = loadLicences();
+  let changed = false;
 
-app.post("/process", (req, res) => {
-  try {
-    const result = analyzeHandsDeterministic(req.body.data || "");
-    res.json({ success: true, result });
-  } catch (err) {
-    res.json({ success: false, error: err.message });
-  }
-});
-
-app.post("/ask", async (req, res) => {
-  const { data, question } = req.body || {};
-  const q = normalize(question || "").toLowerCase();
-
-  if (q.startsWith("analyse ces mains")) {
-    try {
-      const text = analyzeHandsDeterministic(data || "");
-      return res.type("text/plain; charset=utf-8").send(text);
-    } catch (err) {
-      return res.status(500).type("text/plain").send("Erreur analyse: " + err.message);
+  data.licences.forEach((lic) => {
+    if (lic.status === "used" && lic.startTime && lic.durationMs) {
+      const endTime = lic.startTime + lic.durationMs;
+      if (Date.now() > endTime) {
+        // Expirée → remplacer par une nouvelle
+        lic.code = generateLicence(lic.category);
+        lic.status = "available";
+        delete lic.startTime;
+        delete lic.durationMs;
+        changed = true;
+      }
     }
+  });
+
+  if (changed) saveLicences(data);
+}
+
+// Vérifier licence utilisateur
+app.post("/api/check-licence", (req, res) => {
+  const { licence } = req.body;
+  const data = loadLicences();
+  const lic = data.licences.find((l) => l.code === licence);
+
+  if (!lic) return res.json({ valid: false, message: "Licence invalide ❌" });
+
+  if (lic.status === "used") return res.json({ valid: false, message: "Licence déjà utilisée ❌" });
+
+  if (lic.status === "available") {
+    lic.status = "used";
+    lic.startTime = Date.now();
+    lic.durationMs = DURATIONS[lic.category];
+    saveLicences(data);
+    return res.json({ valid: true, message: "Licence activée ✅", duration: lic.durationMs });
   }
 
-  try {
-    const stream = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "Tu es un assistant spécialisé dans l’analyse de mains de cartes. Réponds en français." },
-        { role: "user", content: `Mains :\n${data}\n\nQuestion : ${question}` }
-      ],
-      stream: true
-    });
+  res.json({ valid: false, message: "Licence invalide ❌" });
+});
 
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (delta) res.write(delta);
+// Forcer régénération (admin)
+app.get("/generate-licences", (req, res) => {
+  const categories = Object.keys(DURATIONS);
+  let licences = [];
+
+  categories.forEach((cat) => {
+    for (let i = 0; i < 10; i++) {
+      licences.push({
+        code: generateLicence(cat),
+        category: cat,
+        status: "available"
+      });
     }
-    res.end();
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  });
+
+  saveLicences({ licences });
+  res.json({ message: "Nouvelles licences générées ✅", licences });
 });
 
-/* -------- nouvelles routes licence -------- */
-app.post("/license/use", (req, res) => {
-  const { code } = req.body || {};
-  const lic = licenses[code];
-  if (!lic) return res.json({ success: false, message: "Licence invalide" });
-  if (lic.used) return res.json({ success: false, message: "Licence déjà utilisée" });
+// Vérification périodique des expirations
+setInterval(checkExpirations, 30 * 1000); // toutes les 30 secondes
 
-  lic.used = true;
-  lic.expiresAt = Date.now() + lic.duration;
-  return res.json({ success: true, message: "Licence activée", expiresAt: lic.expiresAt });
+// Serveur
+app.listen(PORT, () => {
+  console.log(`✅ Serveur démarré sur http://localhost:${PORT}`);
 });
-
-app.get("/license/list", (req, res) => {
-  const now = Date.now();
-  const data = Object.entries(licenses).map(([code, lic]) => {
-    if (lic.used && lic.expiresAt <= now) {
-      const newCode = generateLicense(lic.category, lic.duration);
-      licenses[newCode] = { ...lic, used: false, expiresAt: null };
-      delete licenses[code];
-      return null;
-    }
-    let status = "Disponible";
-    if (lic.used) status = "En cours (" + Math.floor((lic.expiresAt - now) / 1000) + "s restants)";
-    return { code, category: lic.category, status };
-  }).filter(Boolean);
-
-  res.json({ success: true, data });
-});
-
-app.listen(PORT, () => console.log(`✅ Serveur démarré sur le port ${PORT}`));
