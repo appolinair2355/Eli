@@ -1,22 +1,20 @@
-{
-  "licences": [
-    { "code": "2025AfiSossoufi#@ABCDEF", "category": "30min", "status": "available" },
-    { "code": "2025BfiSossoufi#@GHIJKL", "category": "30min", "status": "available" },
-    { "code": "2025CfiSossoufi#@MNOPQR", "category": "30min", "status": "available" },
-
-    { "code": "2025DfiSossoufi#@STUVWX", "category": "1h", "status": "available" },
-    { "code": "2025EfiSossoufi#@YZABCD", "category": "1h", "status": "available" },
-
-    { "code": "2025FfiSossoufi#@EFGHIJ", "category": "24h", "status": "available" },
-    { "code": "2025GfiSossoufi#@KLMNOP", "category": "24h", "status": "available" },
-
-    { "code": "2025HfiSossoufi#@QRSTUV", "category": "48h", "status": "available" },
-    { "code": "2025IfiSossoufi#@WXYZAB", "category": "48h", "status": "available" },
-
-    { "code": "2025JfiSossoufi#@CDEFGH", "category": "10min", "status": "available" },
-    { "code": "2025KfiSossoufi#@IJKLMN", "category": "10min", "status": "available" },
-
-    { "code": "2025LfiSossoufi#@OPQRST", "category": "20h", "status": "available" },
-    { "code": "2025MfiSossoufi#@UVWXYZ", "category": "20h", "status": "available" }
-  ]
-}
+[
+  {
+    "key": "ABC123-TEST",
+    "categorie": "Standard",
+    "active": true,
+    "expiresAt": "2025-12-31T23:59:59Z"
+  },
+  {
+    "key": "XYZ789-TEST",
+    "categorie": "Premium",
+    "active": true,
+    "expiresAt": null
+  },
+  {
+    "key": "INVALID-000",
+    "categorie": "Standard",
+    "active": false,
+    "expiresAt": "2024-01-01T00:00:00Z"
+  }
+]
