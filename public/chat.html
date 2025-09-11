@@ -32,8 +32,6 @@
     #exportBtn:hover { background: #1e7e34; }
     .btn-modify { background: #ffc107; color: #000; }
     .btn-modify:hover { background: #e0a800; }
-    .btn-full { background: #6f42c1; }
-    .btn-full:hover { background: #563d7c; }
   </style>
 </head>
 <body>
@@ -61,7 +59,6 @@
     <button onclick="nextEpisode()">Épisode suivant</button>
     <button onclick="editEpisode()" class="btn-modify">✏️ Modifier épisode</button>
     <button onclick="styleStory()">S</button>
-    <button onclick="generateFullStory()" class="btn-full">📖 Histoire complète</button>
     <button onclick="resetStory()" style="background:#dc3545;">🔄 Réinitialiser</button>
   </div>
 
@@ -121,7 +118,7 @@
       });
     }
 
-    // ---------- Génération épisode ----------
+    // ---------- Génération ----------
     async function generateStory() {
       const title = document.getElementById("title").value.trim();
       const episode = document.getElementById("episode").value.trim();
@@ -134,6 +131,7 @@
 
       let context = `Titre : ${title}\nÉpisode ${episode}\nAuteur : ${author}\n\nRésumé initial : ${summary}\n\n`;
 
+      // Inclure les épisodes précédents pour continuité
       if (storyHistory.length > 0) {
         context += `Texte complet des épisodes précédents :\n`;
         storyHistory.forEach(e => {
@@ -141,8 +139,11 @@
         });
       }
 
-      if (consignes) context += `Consignes pour cet épisode : ${consignes}\n`;
-      else context += "⚠️ Continue naturellement l’histoire avec cohérence et évolution des événements.\n";
+      if (consignes) {
+        context += `Consignes pour cet épisode : ${consignes}\n`;
+      } else {
+        context += "⚠️ Continue naturellement l’histoire avec cohérence et évolution des événements.\n";
+      }
 
       if (minWords) context += `⚠️ Minimum ${minWords} mots.\n`;
 
@@ -179,7 +180,9 @@
       storyHistory.push({ title, episode, preview: story.slice(0,100)+"...", content: fullContent, fullText: story });
 
       renderHistory(); saveData();
-      document.getElementById("consignes").value = ""; // vider consignes
+
+      // Vider la zone consignes automatiquement
+      document.getElementById("consignes").value = "";
     }
 
     // ---------- Modifier épisode ----------
@@ -218,6 +221,8 @@ Consignes de modification : "${consignes}".
         resultDiv.innerHTML = existing.content;
       }
       renderHistory(); saveData();
+
+      // Vider consignes après modification
       document.getElementById("consignes").value = "";
     }
 
@@ -241,56 +246,6 @@ Consignes de modification : "${consignes}".
       renderHistory(); saveData();
     }
 
-    // ---------- Histoire complète ----------
-    async function generateFullStory() {
-      const title = document.getElementById("title").value.trim();
-      const author = document.getElementById("author").value.trim();
-      const summary = document.getElementById("summary").value.trim();
-      const consignes = document.getElementById("consignes").value.trim();
-
-      if (!title || !author) { alert("Veuillez remplir Titre et Auteur !"); return; }
-
-      let context = `Titre : ${title}\nAuteur : ${author}\n\nRésumé initial : ${summary}\n\n`;
-
-      if (consignes) context += `Consignes pour l’histoire complète : ${consignes}\n`;
-
-      context += `
-⚠️ Raconte l’histoire complète du début à la fin.
-⚠️ Structure en plusieurs épisodes narratifs, fais évoluer les personnages et les événements.
-⚠️ Termine avec une conclusion et une morale.
-⚠️ Ne rajoute pas le titre ni le numéro d’épisode, écris seulement l’histoire.
-⚠️ Utilise un style riche avec dialogues, descriptions, émotions, emojis, gras et italique.
-`;
-
-      resultDiv.textContent = "⏳ Kouamé AI écrit toute l’histoire…";
-
-      const res = await fetch("/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: "", question: context })
-      });
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let fullStory = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        fullStory += decoder.decode(value, { stream: true });
-        resultDiv.textContent = fullStory;
-      }
-
-      lastStory = fullStory;
-
-      const fullContent = `<h2>${title}</h2><h3>Histoire complète</h3><div>${fullStory}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
-      resultDiv.innerHTML = fullContent;
-
-      storyHistory.push({ title, episode: "Complet", preview: fullStory.slice(0,100)+"...", content: fullContent, fullText: fullStory });
-
-      renderHistory(); saveData();
-      document.getElementById("consignes").value = "";
-    }
-
     // ---------- Réinitialiser ----------
     function resetStory() {
       if (!confirm("Voulez-vous vraiment réinitialiser l’histoire ?")) return;
@@ -308,4 +263,10 @@ Consignes de modification : "${consignes}".
       doc.setFontSize(16); doc.setTextColor(0,0,0); doc.text("Auteur : "+author,105,y,{align:"center"}); y+=20;
       doc.setFontSize(14); doc.setTextColor(80,80,80); const summaryLines=doc.splitTextToSize("Résumé : "+summary,170); doc.text(summaryLines,20,y); doc.addPage();
       y=20;
-      storyHistory.forEach((ep)=>{ doc.setFontSize(16); doc.setTextColor(255,69,0); doc.text(`Épisode ${ep.episode}`,20,y); y+=10; doc.setFontSize(12); doc.setTextColor(0,0,0); const lines=doc.splitTextToSize(ep.fullText,170); lines.forEach(line=>{ if(y>270){doc.addPage(); y=20;} doc.text(line,20,y,{align:"justify"}); y+=7; }); y+=10;
+      storyHistory.forEach((ep)=>{ doc.setFontSize(16); doc.setTextColor(255,69,0); doc.text(`Épisode ${ep.episode}`,20,y); y+=10; doc.setFontSize(12); doc.setTextColor(0,0,0); const lines=doc.splitTextToSize(ep.fullText,170); lines.forEach(line=>{ if(y>270){doc.addPage(); y=20;} doc.text(line,20,y,{align:"justify"}); y+=7; }); y+=10; });
+      doc.setFontSize(10); doc.setTextColor(100,100,100); doc.text("Développeur : Sossou Kouamé",105,290,{align:"center"});
+      doc.save(`${title}.pdf`);
+    }
+  </script>
+</body>
+  </html>
