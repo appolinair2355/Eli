@@ -1,20 +1,14 @@
 [
   {
-    "key": "ABC123-TEST",
+    "key": "demo-123456",
     "categorie": "Standard",
     "active": true,
-    "expiresAt": "2025-12-31T23:59:59Z"
+    "expiresAt": "2025-12-31T23:59:59.999Z"
   },
   {
-    "key": "XYZ789-TEST",
+    "key": "premium-abcdef",
     "categorie": "Premium",
     "active": true,
     "expiresAt": null
-  },
-  {
-    "key": "INVALID-000",
-    "categorie": "Standard",
-    "active": false,
-    "expiresAt": "2024-01-01T00:00:00Z"
   }
 ]
