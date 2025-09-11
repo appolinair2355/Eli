@@ -52,20 +52,15 @@ function analyzeHandsDeterministic(rawInput) {
   const results = [];
 
   for (const raw of lines) {
-    // 1) nettoyage : tags & normalisation
     const clean = normalize(
       raw.replace(/✅|🔵#R|#R|#T\d+|—|–| - | -|-|•/g, " ")
     );
-
-    // 2) ne garder que la 1ʳᵉ parenthèse
     const inside = normalize(firstParenContent(clean));
     if (!inside) continue;
 
-    // 3) n’extraire que 6–10, J, Q, K, A
     const cards = [...inside.matchAll(CARD_RE_6A)].map(m => m[0]);
     if (!cards.length) continue;
 
-    // 4) ligne canonique pour sortie
     const { num, total } = extractNumTotal(clean);
     const lineOut = `#N${num}.${total}(${inside})`;
 
@@ -74,11 +69,9 @@ function analyzeHandsDeterministic(rawInput) {
 
   if (!results.length) return "(Aucune main valide trouvée dans la 1ère parenthèse)";
 
-  // tri strict selon ORDER_6A
   const normOrder = ORDER_6A.map(normalize);
   results.sort((a, b) => normOrder.indexOf(normalize(a.key)) - normOrder.indexOf(normalize(b.key)));
 
-  // regroupement
   const out = [];
   let currentKey = null;
   let bucket = new Set();
@@ -97,16 +90,46 @@ function analyzeHandsDeterministic(rawInput) {
       currentKey = r.key;
       bucket = new Set();
     }
-    bucket.add(r.line); // évite doublons
+    bucket.add(r.line);
   }
   flush();
 
   return out.join("\n").trim();
 }
 
+/* -------- gestion licences -------- */
+const licenses = {};
+const categories = {
+  "10min": 10 * 60 * 1000,
+  "30min": 30 * 60 * 1000,
+  "1h": 60 * 60 * 1000,
+  "20h": 20 * 60 * 60 * 1000,
+  "24h": 24 * 60 * 60 * 1000,
+  "48h": 48 * 60 * 60 * 1000
+};
+
+function randomLetters(len) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function generateLicense(category, durationMs) {
+  const now = new Date();
+  const hour = now.getHours();
+  const base = hour + "2025" + (Math.random() < 0.5 ? String.fromCharCode(65 + Math.floor(Math.random() * 26)) : Math.floor(Math.random() * 9));
+  return base + randomLetters(3) + "Sossoufi#@" + randomLetters(6);
+}
+
+// Initialisation des licences
+for (const [cat, duration] of Object.entries(categories)) {
+  for (let i = 0; i < 10; i++) {
+    const code = generateLicense(cat, duration);
+    licenses[code] = { category: cat, used: false, expiresAt: null, duration };
+  }
+}
+
 /* -------- routes -------- */
 
-// (Optionnel) on garde /process si tu veux tester l’algo depuis l’autre bouton
 app.post("/process", (req, res) => {
   try {
     const result = analyzeHandsDeterministic(req.body.data || "");
@@ -120,7 +143,6 @@ app.post("/ask", async (req, res) => {
   const { data, question } = req.body || {};
   const q = normalize(question || "").toLowerCase();
 
-  // 🚦 Cas déterministe : on bypass l’IA pour garantir l’ordre exact
   if (q.startsWith("analyse ces mains")) {
     try {
       const text = analyzeHandsDeterministic(data || "");
@@ -130,7 +152,6 @@ app.post("/ask", async (req, res) => {
     }
   }
 
-  // 🤖 Sinon, on passe par OpenAI (pour d’autres questions libres)
   try {
     const stream = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -150,6 +171,35 @@ app.post("/ask", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+/* -------- nouvelles routes licence -------- */
+app.post("/license/use", (req, res) => {
+  const { code } = req.body || {};
+  const lic = licenses[code];
+  if (!lic) return res.json({ success: false, message: "Licence invalide" });
+  if (lic.used) return res.json({ success: false, message: "Licence déjà utilisée" });
+
+  lic.used = true;
+  lic.expiresAt = Date.now() + lic.duration;
+  return res.json({ success: true, message: "Licence activée", expiresAt: lic.expiresAt });
+});
+
+app.get("/license/list", (req, res) => {
+  const now = Date.now();
+  const data = Object.entries(licenses).map(([code, lic]) => {
+    if (lic.used && lic.expiresAt <= now) {
+      const newCode = generateLicense(lic.category, lic.duration);
+      licenses[newCode] = { ...lic, used: false, expiresAt: null };
+      delete licenses[code];
+      return null;
+    }
+    let status = "Disponible";
+    if (lic.used) status = "En cours (" + Math.floor((lic.expiresAt - now) / 1000) + "s restants)";
+    return { code, category: lic.category, status };
+  }).filter(Boolean);
+
+  res.json({ success: true, data });
 });
 
 app.listen(PORT, () => console.log(`✅ Serveur démarré sur le port ${PORT}`));
