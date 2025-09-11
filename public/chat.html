@@ -17,8 +17,8 @@
     .btn-row { margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
     button { background: #007bff; border: none; border-radius: 6px; color: white; padding: 12px 18px; font-size: 16px; cursor: pointer; }
     button:hover { background: #0056b3; }
-    #minWords, #numEpisodes { width: 140px; background: #1f1f1f; color: #fff; }
-    #result { margin-top: 20px; padding: 20px; background: #1e1e1e; border-radius: 8px; line-height: 1.6; min-height: 100px; }
+    #minWords { width: 120px; background: #1f1f1f; color: #fff; }
+    #result { margin-top: 20px; padding: 20px; background: #1e1e1e; border-radius: 8px; line-height: 1.6; }
     #result h2, #result h3 { color: #00bfff; }
     #result strong { color: #ffcc00; }
     #result em { color: #ffaaff; }
@@ -34,7 +34,6 @@
     .btn-modify:hover { background: #e0a800; }
     .btn-full { background: #6f42c1; }
     .btn-full:hover { background: #563d7c; }
-    .error { color: red; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -58,8 +57,7 @@
   <!-- Ligne boutons -->
   <div class="btn-row">
     <button onclick="generateStory()">Ai Kouamé généré</button>
-    <input id="minWords" type="number" placeholder="Mots/épisode">
-    <input id="numEpisodes" type="number" placeholder="Nb épisodes (15-20)">
+    <input id="minWords" type="number" placeholder="N (mots min)">
     <button onclick="nextEpisode()">Épisode suivant</button>
     <button onclick="editEpisode()" class="btn-modify">✏️ Modifier épisode</button>
     <button onclick="styleStory()">S</button>
@@ -123,98 +121,104 @@
       });
     }
 
-    // ---------- Utilitaire lecture flux ----------
-    async function readStream(res, onChunk) {
-      if (!res.ok) throw new Error("Erreur serveur : " + res.status);
+    // ---------- Génération épisode ----------
+    async function generateStory() {
+      const title = document.getElementById("title").value.trim();
+      const episode = document.getElementById("episode").value.trim();
+      const author = document.getElementById("author").value.trim();
+      const summary = document.getElementById("summary").value.trim();
+      const consignes = document.getElementById("consignes").value.trim();
+      const minWords = document.getElementById("minWords").value.trim();
+
+      if (!title || !episode || !author) { alert("Veuillez remplir Titre, Épisode et Auteur !"); return; }
+
+      let context = `Titre : ${title}\nÉpisode ${episode}\nAuteur : ${author}\n\nRésumé initial : ${summary}\n\n`;
+
+      if (storyHistory.length > 0) {
+        context += `Texte complet des épisodes précédents :\n`;
+        storyHistory.forEach(e => {
+          context += `--- Épisode ${e.episode} ---\n${e.fullText}\n\n`;
+        });
+      }
+
+      if (consignes) context += `Consignes pour cet épisode : ${consignes}\n`;
+      else context += "⚠️ Continue naturellement l’histoire avec cohérence et évolution des événements.\n";
+
+      if (minWords) context += `⚠️ Minimum ${minWords} mots.\n`;
+
+      context += `
+⚠️ Ne réécris pas le titre ni le numéro d’épisode.
+⚠️ Respecte le titre "${title}".
+⚠️ Continue logiquement l’histoire, fais évoluer les personnages et événements.
+⚠️ Style narratif fluide avec émotions, dialogues, emojis, gras et italique.
+`;
+
+      resultDiv.textContent = "⏳ Kouamé AI réfléchit…";
+
+      const res = await fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: "", question: context })
+      });
+
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let text = "";
+      let story = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        text += decoder.decode(value, { stream: true });
-        if (onChunk) onChunk(text);
+        story += decoder.decode(value, { stream: true });
+        resultDiv.textContent = story;
       }
-      return text;
-    }
 
-    // ---------- Génération épisode ----------
-    async function generateStory() {
-      try {
-        const title = document.getElementById("title").value.trim();
-        const episode = document.getElementById("episode").value.trim();
-        const author = document.getElementById("author").value.trim();
-        const summary = document.getElementById("summary").value.trim();
-        const consignes = document.getElementById("consignes").value.trim();
-        const minWords = document.getElementById("minWords").value.trim();
+      lastStory = story;
 
-        if (!title || !episode || !author) { alert("Veuillez remplir Titre, Épisode et Auteur !"); return; }
+      const fullContent = `<h2>${title}</h2><h3>Épisode ${episode}</h3><div>${story}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
+      resultDiv.innerHTML = fullContent;
 
-        let context = `Titre : ${title}\nÉpisode ${episode}\nAuteur : ${author}\n\nRésumé initial : ${summary}\n\n`;
-        if (storyHistory.length > 0) {
-          context += `Texte des épisodes précédents :\n`;
-          storyHistory.forEach(e => context += `--- Épisode ${e.episode} ---\n${e.fullText}\n\n`);
-        }
-        if (consignes) context += `Consignes : ${consignes}\n`;
-        else context += "⚠️ Continue naturellement l’histoire avec cohérence.\n";
-        if (minWords) context += `⚠️ Minimum ${minWords} mots.\n`;
+      storyHistory.push({ title, episode, preview: story.slice(0,100)+"...", content: fullContent, fullText: story });
 
-        context += `⚠️ Style narratif fluide avec dialogues, emojis, gras et italique.\n`;
-
-        resultDiv.textContent = "⏳ Kouamé AI réfléchit…";
-
-        const res = await fetch("/ask", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data: "", question: context })
-        });
-
-        const story = await readStream(res, text => resultDiv.textContent = text);
-        lastStory = story;
-
-        const fullContent = `<h2>${title}</h2><h3>Épisode ${episode}</h3><div>${story}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
-        resultDiv.innerHTML = fullContent;
-        storyHistory.push({ title, episode, preview: story.slice(0,100)+"...", content: fullContent, fullText: story });
-
-        renderHistory(); saveData();
-        document.getElementById("consignes").value = "";
-      } catch (err) {
-        console.error(err);
-        resultDiv.innerHTML = `<p class="error">❌ Erreur génération épisode : ${err.message}</p>`;
-      }
+      renderHistory(); saveData();
+      document.getElementById("consignes").value = ""; // vider consignes
     }
 
     // ---------- Modifier épisode ----------
     async function editEpisode() {
-      try {
-        if (!lastStory) { alert("Aucun épisode à modifier !"); return; }
-        const consignes = document.getElementById("consignes").value.trim();
-        if (!consignes) { alert("Écrivez vos consignes !"); return; }
-        const title = document.getElementById("title").value.trim();
-        const episode = document.getElementById("episode").value.trim();
-        const author = document.getElementById("author").value.trim();
+      if (!lastStory) { alert("Aucun épisode à modifier !"); return; }
+      const consignes = document.getElementById("consignes").value.trim();
+      if (!consignes) { alert("Écrivez vos consignes de modification !"); return; }
+      const title = document.getElementById("title").value.trim();
+      const episode = document.getElementById("episode").value.trim();
+      const author = document.getElementById("author").value.trim();
 
-        const editPrompt = `Texte original épisode ${episode} de "${title}" :\n${lastStory}\n\nConsignes : ${consignes}\n⚠️ Applique uniquement ces changements.\n`;
+      const editPrompt = `
+Voici le texte original de l’épisode ${episode} de l’histoire "${title}" :
 
-        resultDiv.textContent = "✏️ Application des modifications…";
+${lastStory}
 
-        const res = await fetch("/ask",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ data:"", question:editPrompt }) });
-        const modified = await readStream(res, text => resultDiv.textContent = text);
-        lastStory = modified;
+Consignes de modification : "${consignes}".
 
-        const existing = storyHistory.find(ep => ep.episode === episode);
-        if (existing) {
-          existing.fullText = modified;
-          existing.preview = modified.slice(0,100)+"...";
-          existing.content = `<h2>${title}</h2><h3>Épisode ${episode}</h3><div>${modified}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
-          resultDiv.innerHTML = existing.content;
-        }
-        renderHistory(); saveData();
-        document.getElementById("consignes").value = "";
-      } catch (err) {
-        console.error(err);
-        resultDiv.innerHTML = `<p class="error">❌ Erreur modification : ${err.message}</p>`;
+⚠️ Applique uniquement ces changements.
+⚠️ Ne modifie rien d’autre.
+⚠️ Ne rajoute pas de titre ni numéro d’épisode.
+`;
+
+      resultDiv.textContent = "✏️ Application des modifications…";
+
+      const res = await fetch("/ask",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ data:"", question:editPrompt }) });
+      const reader = res.body.getReader(); const decoder = new TextDecoder(); let modified = "";
+      while (true) { const {done, value} = await reader.read(); if (done) break; modified += decoder.decode(value,{stream:true}); resultDiv.textContent = modified; }
+      lastStory = modified;
+
+      const existing = storyHistory.find(ep => ep.episode === episode);
+      if (existing) {
+        existing.fullText = modified;
+        existing.preview = modified.slice(0,100)+"...";
+        existing.content = `<h2>${title}</h2><h3>Épisode ${episode}</h3><div>${modified}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
+        resultDiv.innerHTML = existing.content;
       }
+      renderHistory(); saveData();
+      document.getElementById("consignes").value = "";
     }
 
     async function nextEpisode() { 
@@ -224,76 +228,67 @@
     }
 
     async function styleStory() {
-      try {
-        if (!lastStory) { alert("Générez d’abord une histoire !"); return; }
-        const stylePrompt = `Réécris ce texte avec style (gras, italique, emojis), sans changer le sens :\n${lastStory}`;
-        resultDiv.textContent = "✨ Application du style…";
-        const res = await fetch("/ask",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ data:"", question:stylePrompt }) });
-        const styled = await readStream(res, text => resultDiv.textContent = text);
-        lastStory = styled;
-
-        const episode = document.getElementById("episode").value.trim(); 
-        const title = document.getElementById("title").value.trim(); 
-        const author = document.getElementById("author").value.trim();
-        const existing = storyHistory.find(ep => ep.episode === episode);
-        if (existing) {
-          existing.fullText = styled;
-          existing.preview = styled.slice(0,100)+"...";
-          existing.content = `<h2>${title}</h2><h3>Épisode ${episode}</h3><div>${styled}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
-          resultDiv.innerHTML = existing.content;
-        }
-        renderHistory(); saveData();
-      } catch (err) {
-        console.error(err);
-        resultDiv.innerHTML = `<p class="error">❌ Erreur style : ${err.message}</p>`;
-      }
+      if (!lastStory) { alert("Générez d’abord une histoire !"); return; }
+      const stylePrompt = `Réécris ce texte avec style (gras, italique, emojis), sans changer le sens ni rajouter titre ou numéro :\n${lastStory}`;
+      resultDiv.textContent = "✨ Application du style…";
+      const res = await fetch("/ask",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ data:"", question:stylePrompt }) });
+      const reader = res.body.getReader(); const decoder = new TextDecoder(); let styled = "";
+      while (true) { const {done, value} = await reader.read(); if (done) break; styled += decoder.decode(value,{stream:true}); resultDiv.textContent = styled; }
+      lastStory = styled;
+      const episode = document.getElementById("episode").value.trim(); const title = document.getElementById("title").value.trim(); const author = document.getElementById("author").value.trim();
+      const existing = storyHistory.find(ep => ep.episode === episode);
+      if (existing) { existing.fullText = styled; existing.preview = styled.slice(0,100)+"..."; existing.content = `<h2>${title}</h2><h3>Épisode ${episode}</h3><div>${styled}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`; resultDiv.innerHTML = existing.content; }
+      renderHistory(); saveData();
     }
 
     // ---------- Histoire complète ----------
     async function generateFullStory() {
-      try {
-        const title = document.getElementById("title").value.trim();
-        const author = document.getElementById("author").value.trim();
-        const summary = document.getElementById("summary").value.trim();
-        const consignes = document.getElementById("consignes").value.trim();
-        const minWords = document.getElementById("minWords").value.trim();
-        let numEpisodes = parseInt(document.getElementById("numEpisodes").value.trim());
+      const title = document.getElementById("title").value.trim();
+      const author = document.getElementById("author").value.trim();
+      const summary = document.getElementById("summary").value.trim();
+      const consignes = document.getElementById("consignes").value.trim();
 
-        if (!title || !author) { alert("Veuillez remplir Titre et Auteur !"); return; }
-        if (isNaN(numEpisodes) || numEpisodes < 15) numEpisodes = 15;
-        if (numEpisodes > 20) numEpisodes = 20;
+      if (!title || !author) { alert("Veuillez remplir Titre et Auteur !"); return; }
 
-        let context = `Titre : ${title}\nAuteur : ${author}\nRésumé initial : ${summary}\n\n`;
-        if (consignes) context += `Consignes : ${consignes}\n`;
+      let context = `Titre : ${title}\nAuteur : ${author}\n\nRésumé initial : ${summary}\n\n`;
 
-        context += `⚠️ Raconte l’histoire complète en ${numEpisodes} épisodes.
-⚠️ Chaque épisode doit avoir au moins ${minWords || 200} mots.
-⚠️ Sépare clairement chaque épisode par "Épisode X".
-⚠️ Fais évoluer les personnages et termine avec une conclusion et une morale.
-⚠️ Style riche avec dialogues, descriptions, emojis, gras et italique.\n`;
+      if (consignes) context += `Consignes pour l’histoire complète : ${consignes}\n`;
 
-        resultDiv.textContent = "⏳ Kouamé AI écrit toute l’histoire…";
+      context += `
+⚠️ Raconte l’histoire complète du début à la fin.
+⚠️ Structure en plusieurs épisodes narratifs, fais évoluer les personnages et les événements.
+⚠️ Termine avec une conclusion et une morale.
+⚠️ Ne rajoute pas le titre ni le numéro d’épisode, écris seulement l’histoire.
+⚠️ Utilise un style riche avec dialogues, descriptions, émotions, emojis, gras et italique.
+`;
 
-        const res = await fetch("/ask", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data: "", question: context })
-        });
+      resultDiv.textContent = "⏳ Kouamé AI écrit toute l’histoire…";
 
-        const fullStory = await readStream(res, text => resultDiv.textContent = text);
-        lastStory = fullStory;
+      const res = await fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: "", question: context })
+      });
 
-        const fullContent = `<h2>${title}</h2><h3>Histoire complète (${numEpisodes} épisodes)</h3><div>${fullStory}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
-        resultDiv.innerHTML = fullContent;
-
-        storyHistory.push({ title, episode: "Complet", preview: fullStory.slice(0,100)+"...", content: fullContent, fullText: fullStory });
-
-        renderHistory(); saveData();
-        document.getElementById("consignes").value = "";
-      } catch (err) {
-        console.error(err);
-        resultDiv.innerHTML = `<p class="error">❌ Erreur histoire complète : ${err.message}</p>`;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullStory = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        fullStory += decoder.decode(value, { stream: true });
+        resultDiv.textContent = fullStory;
       }
+
+      lastStory = fullStory;
+
+      const fullContent = `<h2>${title}</h2><h3>Histoire complète</h3><div>${fullStory}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
+      resultDiv.innerHTML = fullContent;
+
+      storyHistory.push({ title, episode: "Complet", preview: fullStory.slice(0,100)+"...", content: fullContent, fullText: fullStory });
+
+      renderHistory(); saveData();
+      document.getElementById("consignes").value = "";
     }
 
     // ---------- Réinitialiser ----------
@@ -308,13 +303,9 @@
     async function exportPDF() {
       if (storyHistory.length===0) { alert("Aucune histoire à exporter !"); return; }
       const { jsPDF } = window.jspdf; const doc = new jsPDF(); let y=30;
-      const title=document.getElementById("title").value||"Mon Histoire"; 
-      const author=document.getElementById("author").value||"Inconnu"; 
-      const summary=document.getElementById("summary").value||"Pas de résumé";
+      const title=document.getElementById("title").value||"Mon Histoire"; const author=document.getElementById("author").value||"Inconnu"; const summary=document.getElementById("summary").value||"Pas de résumé";
       doc.setFontSize(24); doc.setTextColor(30,144,255); doc.text(title,105,y,{align:"center"}); y+=20;
       doc.setFontSize(16); doc.setTextColor(0,0,0); doc.text("Auteur : "+author,105,y,{align:"center"}); y+=20;
       doc.setFontSize(14); doc.setTextColor(80,80,80); const summaryLines=doc.splitTextToSize("Résumé : "+summary,170); doc.text(summaryLines,20,y); doc.addPage();
       y=20;
-      storyHistory.forEach((ep)=>{ 
-        doc.setFontSize(16); doc.setTextColor(255,69,0); 
-        doc.text(`Épisode ${ep.episode}`,
+      storyHistory.forEach((ep)=>{ doc.setFontSize(16); doc.setTextColor(255,69,0); doc.text(`Épisode ${ep.episode}`,20,y); y+=10; doc.setFontSize(12); doc.setTextColor(0,0,0); const lines=doc.splitTextToSize(ep.fullText,170); lines.forEach(line=>{ if(y>270){doc.addPage(); y=20;} doc.text(line,20,y,{align:"justify"}); y+=7; }); y+=10;
