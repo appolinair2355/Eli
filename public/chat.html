@@ -34,11 +34,10 @@
     .btn-modify:hover { background: #e0a800; }
 
     /* 🎨 Styles personnalisés */
-    .dialogue { color: #1e90ff; }
-    .proverbe { color: #ff4444; }
-    .poeme { color: #ff69b4; font-style: italic; }
-    .bible { color: #ffcc00; font-weight: bold; }
-    .highlight { color: #00bfff; font-weight: bold; }
+    .dialogue { color: #1e90ff; }       /* Bleu pour dialogues */
+    .proverbe { color: #ff4444; }       /* Rouge pour proverbes */
+    .poeme { color: #ff69b4; font-style: italic; } /* Rose pour poèmes */
+    .bible { color: #ffcc00; font-weight: bold; } /* Jaune gras pour Bible */
   </style>
 </head>
 <body>
@@ -67,10 +66,6 @@
     <button onclick="editEpisode()" class="btn-modify">✏️ Modifier épisode</button>
     <button onclick="styleStory()">S</button>
     <button onclick="resetStory()" style="background:#dc3545;">🔄 Réinitialiser</button>
-    <button onclick="copyEpisode()" style="background:#17a2b8;">📋 Copier</button>
-    <button onclick="deleteEpisode()" style="background:#ff4444;">🗑 Supprimer épisode</button>
-    <button onclick="exportCurrentPDF()" style="background:#6f42c1;">📄 Exporter épisode</button>
-    <input id="searchHistory" type="text" placeholder="🔍 Rechercher..." oninput="filterHistory()" style="max-width:200px;">
   </div>
 
   <!-- Résultat -->
@@ -153,11 +148,11 @@
 
       let context = `Titre : ${title}\nÉpisode ${episode}\nAuteur : ${author}\n\nRésumé initial : ${summary}\n\n`;
 
-      // Continuité avec dernière phrase
+      // ✅ Continuité avec dernière phrase
       if (storyHistory.length > 0) {
-        const lastEp = storyHistory[storyHistory.length - 1].fullText.replace(/<[^>]+>/g,"").trim();
+        const lastEp = storyHistory[storyHistory.length - 1].fullText.trim();
         const lastSentence = lastEp.split(/(?<=[.!?])\s+/).pop();
-        context += `⚠️ Le nouvel épisode doit commencer par cette phrase : "${lastSentence}".\n\n`;
+        context += `⚠️ Le nouvel épisode doit commencer exactement par cette phrase : "${lastSentence}".\n\n`;
       }
 
       if (consignes) {
@@ -193,19 +188,6 @@
         resultDiv.textContent = story;
       }
 
-      // Vérification stricte de continuité
-      if (storyHistory.length > 0) {
-        const lastEp = storyHistory[storyHistory.length - 1].fullText.replace(/<[^>]+>/g,"").trim();
-        const sentences = lastEp.split(/(?<=[.!?])\s+/);
-        const lastSentence = sentences.pop()?.trim();
-        if (lastSentence && !story.startsWith(lastSentence)) {
-          story = lastSentence + " " + story;
-        }
-        // Mise en évidence visuelle
-        story = story.replace(lastSentence, `<span class="highlight">${lastSentence}</span>`);
-      }
-
-      // 🎨 Formatage
       story = formatStoryText(story);
       lastStory = story;
 
@@ -265,12 +247,14 @@ Consignes de modification : "${consignes}".
       document.getElementById("consignes").value = "";
     }
 
+    // ---------- Épisode suivant ----------
     async function nextEpisode() {
       const epInput = document.getElementById("episode");
       epInput.value = parseInt(epInput.value||"0")+1;
       await generateStory();
     }
 
+    // ---------- Style ----------
     async function styleStory() {
       if (!lastStory) { alert("Générez d’abord une histoire !"); return; }
       const stylePrompt = `Réécris ce texte avec style (gras, italique, emojis), sans changer le sens ni rajouter titre ou numéro :\n${lastStory}`;
@@ -308,7 +292,21 @@ Consignes de modification : "${consignes}".
       doc.setFontSize(16); doc.setTextColor(0,0,0); doc.text("Auteur : "+author,105,y,{align:"center"}); y+=20;
       doc.setFontSize(14); doc.setTextColor(80,80,80); const summaryLines=doc.splitTextToSize("Résumé : "+summary,170); doc.text(summaryLines,20,y); doc.addPage();
       y=20;
-      storyHistory.forEach((ep)=>{ 
-        doc.setFontSize(16); doc.setTextColor(255,69,0); 
-        doc.text(`Épisode ${ep.episode}`,20,y); y+=10; 
+      storyHistory.forEach((ep)=>{
+        doc.setFontSize(16); doc.setTextColor(255,69,0);
+        doc.text(`Épisode ${ep.episode}`,20,y); y+=10;
         doc.setFontSize(12); doc.setTextColor(0,0,0);
+        const lines=doc.splitTextToSize(ep.fullText.replace(/<[^>]+>/g,""),170);
+        lines.forEach(line=>{
+          if(y>270){doc.addPage(); y=20;}
+          doc.text(line,20,y,{align:"justify"});
+          y+=7;
+        });
+        y+=10;
+      });
+      doc.setFontSize(10); doc.setTextColor(100,100,100); doc.text("Développeur : Sossou Kouamé",105,290,{align:"center"});
+      doc.save(`${title}.pdf`);
+    }
+  </script>
+</body>
+  </html>
