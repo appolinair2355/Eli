@@ -38,8 +38,9 @@ function normalize(str = "") {
 /* -------- utilitaires -------- */
 const CARD_RE_6A = /(10|[6-9]|[AJQK])[♠♦♣♥]/g;
 
+/* ✅ Correction ici */
 function firstParenContent(line) {
-  const m = line.match(/ $([^)]*)$/);
+  const m = line.match(/\(([^)]*)\)/);  // récupère le contenu entre parenthèses
   return m ? m[1] : "";
 }
 
@@ -48,13 +49,13 @@ function extractNumTotal(line) {
   return m ? { num: m[1], total: m[2] } : { num: "?", total: "?" };
 }
 
-/* -------- traitement déterministe pour “Analyse ces mains …” -------- */
+/* -------- traitement déterministe -------- */
 function analyzeHandsDeterministic(rawInput) {
   const lines = String(rawInput).split(/\r?\n/).map(normalize).filter(Boolean);
   const results = [];
 
   for (const raw of lines) {
-    // 1) nettoyage : tags & normalisation
+    // 1) nettoyage
     const clean = normalize(
       raw.replace(/✅|🔵#R|#R|#T\d+|—|–| - | -|-|•/g, " ")
     );
@@ -63,11 +64,11 @@ function analyzeHandsDeterministic(rawInput) {
     const inside = normalize(firstParenContent(clean));  
     if (!inside) continue;  
 
-    // 3) n’extraire que 6–10, J, Q, K, A  
+    // 3) extraire les cartes
     const cards = [...inside.matchAll(CARD_RE_6A)].map(m => m[0]);  
     if (!cards.length) continue;  
 
-    // 4) ligne canonique pour sortie  
+    // 4) ligne canonique
     const { num, total } = extractNumTotal(clean);  
     const lineOut = `#N${num}.${total}(${inside})`;  
 
@@ -76,7 +77,7 @@ function analyzeHandsDeterministic(rawInput) {
 
   if (!results.length) return "(Aucune main valide trouvée dans la 1ère parenthèse)";
 
-  // tri strict selon ORDER_6A
+  // tri strict
   const normOrder = ORDER_6A.map(normalize);
   results.sort((a, b) => normOrder.indexOf(normalize(a.key)) - normOrder.indexOf(normalize(b.key)));
 
@@ -99,15 +100,14 @@ function analyzeHandsDeterministic(rawInput) {
       currentKey = r.key;
       bucket = new Set();
     }
-    bucket.add(r.line); // évite doublons
+    bucket.add(r.line);
   }
   flush();
 
   return out.join("\n").trim();
 }
 
-/* -------- routes existantes -------- */
-
+/* -------- routes -------- */
 app.post("/process", (req, res) => {
   try {
     const result = analyzeHandsDeterministic(req.body.data || "");
@@ -121,7 +121,6 @@ app.post("/ask", async (req, res) => {
   const { data, question } = req.body || {};
   const q = normalize(question || "").toLowerCase();
 
-  // 🚦 Cas déterministe : on bypass l’IA pour garantir l’ordre exact
   if (q.startsWith("analyse ces mains")) {
     try {
       const text = analyzeHandsDeterministic(data || "");
@@ -131,7 +130,6 @@ app.post("/ask", async (req, res) => {
     }
   }
 
-  // 🤖 Sinon, on passe par OpenAI (pour d’autres questions libres)
   try {
     const stream = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -155,10 +153,8 @@ app.post("/ask", async (req, res) => {
 });
 
 /* ===== LICENCE SYSTEM ===== */
-
 const LICENCE_FILE = path.join(__dirname, "licences.json");
 
-// Vérifier une licence
 app.post("/api/check-licence", (req, res) => {
   try {
     const { licence } = req.body;
@@ -188,7 +184,6 @@ app.post("/api/check-licence", (req, res) => {
   }
 });
 
-// Liste des licences (admin)
 app.get("/api/licences", (req, res) => {
   try {
     const licences = JSON.parse(fs.readFileSync(LICENCE_FILE, "utf8"));
@@ -199,7 +194,6 @@ app.get("/api/licences", (req, res) => {
   }
 });
 
-// Ajouter une licence (admin)
 app.post("/api/add-licence", (req, res) => {
   try {
     const { key, categorie, expiresAt } = req.body;
@@ -230,4 +224,3 @@ app.post("/api/add-licence", (req, res) => {
 
 /* -------- Démarrage -------- */
 app.listen(PORT, () => console.log(`✅ Serveur démarré sur le port ${PORT}`));
-  
