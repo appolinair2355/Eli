@@ -3,134 +3,310 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Kouamé AI – Chat</title>
+  <title>Kouamé AI – Générateur d’histoires</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #121212;
-      color: white;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
-    header {
-      text-align: center;
-      padding: 15px;
-      background: #1f1f1f;
-      font-size: 20px;
-    }
-    #chat {
-      flex: 1;
-      padding: 20px;
-      overflow-y: auto;
-      background: #000; /* ✅ fond noir pur pour la zone du chat */
-      display: flex;
-      flex-direction: column;
-    }
-    .message {
-      margin: 10px 0;
-      padding: 10px 15px;
-      border-radius: 8px;
-      max-width: 70%;
-      line-height: 1.5;
-      word-wrap: break-word;
-    }
-    .user {
-      background: #007bff;
-      color: white;
-      align-self: flex-end;
-    }
-    .ai {
-      background: #2a2a2a;
-      color: #fff;
-      align-self: flex-start;
-    }
-    #inputArea {
-      display: flex;
-      padding: 10px;
-      background: #1f1f1f;
-    }
-    #question {
-      flex: 1;
-      padding: 10px;
-      border: none;
-      border-radius: 6px;
-      background: #2a2a2a;
-      color: white;
-      font-size: 16px;
-    }
-    button {
-      margin-left: 10px;
-      padding: 10px 20px;
-      background: #007bff;
-      border: none;
-      border-radius: 6px;
-      color: white;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #0056b3;
-    }
+    body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 20px; background: #121212; color: #fff; }
+    h1 { text-align: center; margin-bottom: 20px; }
+    .form-row { display: flex; gap: 10px; margin-bottom: 15px; }
+    input, textarea { width: 100%; padding: 10px; border: none; border-radius: 6px; font-size: 16px; }
+    input { background: #1f1f1f; color: #fff; }
+    textarea { background: #1f1f1f; color: #fff; resize: vertical; }
+    #summary { height: 120px; }
+    #consignes { height: 150px; }
+    .btn-row { margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
+    button { background: #007bff; border: none; border-radius: 6px; color: white; padding: 12px 18px; font-size: 16px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    #minWords { width: 120px; background: #1f1f1f; color: #fff; }
+    #result { margin-top: 20px; padding: 20px; background: #1e1e1e; border-radius: 8px; line-height: 1.6; }
+    #result h2, #result h3 { color: #00bfff; }
+    #result strong { color: #ffcc00; }
+    #result em { color: #ffaaff; }
+    .signature { margin-top: 15px; font-size: 14px; color: #aaa; text-align: right; }
+    #history { margin-top: 30px; padding: 15px; background: #1a1a1a; border-radius: 8px; }
+    #history h2 { margin-top: 0; color: #ffcc00; }
+    #history ul { list-style: none; padding: 0; margin: 0; }
+    #history li { padding: 8px; margin: 5px 0; background: #2a2a2a; border-radius: 5px; cursor: pointer; }
+    #history li:hover { background: #444; }
+    #exportBtn { margin-top: 15px; background: #28a745; }
+    #exportBtn:hover { background: #1e7e34; }
+    .btn-modify { background: #ffc107; color: #000; }
+    .btn-modify:hover { background: #e0a800; }
+
+    /* 🎨 Styles personnalisés */
+    .dialogue { color: #1e90ff; }       /* Bleu pour dialogues */
+    .proverbe { color: #ff4444; }       /* Rouge pour proverbes */
+    .poeme { color: #ff69b4; font-style: italic; } /* Rose pour poèmes */
+    .bible { color: #ffcc00; font-weight: bold; } /* Jaune gras pour Bible */
   </style>
 </head>
 <body>
-  <header>💬 Kouamé AI – Chat</header>
-  <div id="chat"></div>
+  <h1>📖 Générateur d’histoires – Kouamé AI</h1>
 
-  <div id="inputArea">
-    <input id="question" type="text" placeholder="Écrivez votre question..." onkeypress="if(event.key==='Enter'){sendMessage();}">
-    <button onclick="sendMessage()">Envoyer</button>
+  <!-- Ligne titre / épisode / auteur -->
+  <div class="form-row">
+    <input id="title" type="text" placeholder="Titre de l’histoire">
+    <input id="episode" type="number" placeholder="Épisode">
+    <input id="author" type="text" placeholder="Auteur">
+  </div>
+
+  <!-- Résumé initial -->
+  <label for="summary">Résumé de base (présentation des personnages et contexte) :</label>
+  <textarea id="summary" placeholder="Décrivez vos personnages, univers et contexte de départ..."></textarea>
+
+  <!-- Zone de consignes -->
+  <label for="consignes">Consignes / Modifications :</label>
+  <textarea id="consignes" placeholder="Laissez vide pour que l’IA continue seule, ou écrivez vos consignes ici..."></textarea>
+
+  <!-- Ligne boutons -->
+  <div class="btn-row">
+    <button onclick="generateStory()">Ai Kouamé généré</button>
+    <input id="minWords" type="number" placeholder="N (mots min)">
+    <button onclick="nextEpisode()">Épisode suivant</button>
+    <button onclick="editEpisode()" class="btn-modify">✏️ Modifier épisode</button>
+    <button onclick="styleStory()">S</button>
+    <button onclick="resetStory()" style="background:#dc3545;">🔄 Réinitialiser</button>
+  </div>
+
+  <!-- Résultat -->
+  <div id="result"></div>
+
+  <!-- Historique -->
+  <div id="history">
+    <h2>📚 Historique des épisodes</h2>
+    <ul id="historyList"></ul>
+    <button id="exportBtn" onclick="exportPDF()">📥 Exporter en PDF</button>
   </div>
 
   <script>
-    const chatDiv = document.getElementById("chat");
-    const questionInput = document.getElementById("question");
+    const resultDiv = document.getElementById("result");
+    const historyList = document.getElementById("historyList");
+    let lastStory = "";
+    let storyHistory = [];
 
-    async function sendMessage() {
-      const question = questionInput.value.trim();
-      if (!question) return;
-
-      // Affiche le message utilisateur
-      addMessage(question, "user");
-      questionInput.value = "";
-
-      // Message temporaire
-      const thinking = addMessage("⏳ Kouamé AI réfléchit...", "ai");
-
-      try {
-        // Appel vers ton serveur (endpoint /ask)
-        const res = await fetch("/ask", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question })
-        });
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let answer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          answer += decoder.decode(value, { stream: true });
-          thinking.textContent = answer;
-        }
-      } catch (err) {
-        thinking.textContent = "❌ Erreur : " + err.message;
-      }
+    // 🎨 Fonction de formatage
+    function formatStoryText(text) {
+      let formatted = text
+        .replace(/(^|\n)-\s*([^.\n!?]+[.\n!?]*)/g, (m, p1, p2) => `${p1}<span class="dialogue">- ${p2.trim()}</span>`)
+        .replace(/«([^»]+)»/g, '<span class="proverbe">«$1»</span>')
+        .replace(/poeme([\s\S]*?)\/poeme/g, '<span class="poeme">$1</span>')
+        .replace(/bible([\s\S]*?)\/bible/g, '<span class="bible">$1</span>')
+        .replace(/([.!?])\s*/g, "$1<br><br>");
+      return formatted.trim();
     }
 
-    function addMessage(text, sender) {
-      const msg = document.createElement("div");
-      msg.className = "message " + sender;
-      msg.textContent = text;
-      chatDiv.appendChild(msg);
-      chatDiv.scrollTop = chatDiv.scrollHeight;
-      return msg;
+    // ---------- Sauvegarde ----------
+    function saveData() {
+      const data = {
+        title: document.getElementById("title").value,
+        episode: document.getElementById("episode").value,
+        author: document.getElementById("author").value,
+        summary: document.getElementById("summary").value,
+        history: storyHistory,
+        result: resultDiv.innerHTML
+      };
+      localStorage.setItem("storyData", JSON.stringify(data));
+    }
+
+    function loadData() {
+      const saved = localStorage.getItem("storyData");
+      if (!saved) return;
+      const data = JSON.parse(saved);
+      document.getElementById("title").value = data.title || "";
+      document.getElementById("episode").value = data.episode || "";
+      document.getElementById("author").value = data.author || "";
+      document.getElementById("summary").value = data.summary || "";
+      storyHistory = data.history || [];
+      resultDiv.innerHTML = data.result || "";
+      renderHistory();
+    }
+
+    window.onload = loadData;
+    window.onbeforeunload = saveData;
+
+    // ---------- Historique ----------
+    function renderHistory() {
+      historyList.innerHTML = "";
+      storyHistory.forEach((ep) => {
+        const li = document.createElement("li");
+        li.textContent = ep.title + " – Épisode " + ep.episode;
+        li.onclick = () => { resultDiv.innerHTML = ep.content; lastStory = ep.fullText; };
+        historyList.appendChild(li);
+      });
+    }
+
+    // ---------- Génération ----------
+    async function generateStory() {
+      const title = document.getElementById("title").value.trim();
+      const episode = document.getElementById("episode").value.trim();
+      const author = document.getElementById("author").value.trim();
+      const summary = document.getElementById("summary").value.trim();
+      const consignes = document.getElementById("consignes").value.trim();
+      const minWords = document.getElementById("minWords").value.trim();
+
+      if (!title || !episode || !author) { alert("Veuillez remplir Titre, Épisode et Auteur !"); return; }
+
+      let context = `Titre : ${title}\nÉpisode ${episode}\nAuteur : ${author}\n\nRésumé initial : ${summary}\n\n`;
+
+      // ✅ Continuité avec dernière phrase
+      if (storyHistory.length > 0) {
+        const lastEp = storyHistory[storyHistory.length - 1].fullText.trim();
+        const lastSentence = lastEp.split(/(?<=[.!?])\s+/).pop();
+        context += `⚠️ Le nouvel épisode doit commencer exactement par cette phrase : "${lastSentence}".\n\n`;
+      }
+
+      if (consignes) {
+        context += `Consignes pour cet épisode : ${consignes}\n`;
+      } else {
+        context += "⚠️ Continue naturellement l’histoire avec cohérence et évolution des événements.\n";
+      }
+
+      if (minWords) context += `⚠️ Minimum ${minWords} mots.\n`;
+
+      context += `
+⚠️ Ne commence JAMAIS un épisode par "Le lendemain", "Deux mois plus tard", "De l’autre côté de la ville" ou équivalent.
+⚠️ N’ajoute pas de titre ni numéro d’épisode.
+⚠️ Dialogues sous forme de liste avec tiret en début de ligne.
+⚠️ Style narratif fluide avec émotions, dialogues, proverbes, poèmes et références bibliques.
+`;
+
+      resultDiv.textContent = "⏳ Kouamé AI réfléchit…";
+
+      const res = await fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: "", question: context })
+      });
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let story = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        story += decoder.decode(value, { stream: true });
+        resultDiv.textContent = story;
+      }
+
+      story = formatStoryText(story);
+      lastStory = story;
+
+      const fullContent = `<h2>${title}</h2><h3>Épisode ${episode}</h3><div>${story}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
+      resultDiv.innerHTML = fullContent;
+
+      storyHistory.push({
+        title,
+        episode: parseInt(episode, 10),
+        preview: story.slice(0,100)+"...",
+        content: fullContent,
+        fullText: story
+      });
+
+      renderHistory(); saveData();
+      document.getElementById("consignes").value = "";
+    }
+
+    // ---------- Modifier épisode ----------
+    async function editEpisode() {
+      if (!lastStory) { alert("Aucun épisode à modifier !"); return; }
+      const consignes = document.getElementById("consignes").value.trim();
+      if (!consignes) { alert("Écrivez vos consignes de modification !"); return; }
+      const title = document.getElementById("title").value.trim();
+      const episode = document.getElementById("episode").value.trim();
+      const author = document.getElementById("author").value.trim();
+
+      const editPrompt = `
+Voici le texte original de l’épisode ${episode} de l’histoire "${title}" :
+
+${lastStory}
+
+Consignes de modification : "${consignes}".
+
+⚠️ Applique uniquement ces changements.
+⚠️ Ne modifie rien d’autre.
+⚠️ Ne rajoute pas de titre ni numéro d’épisode.
+`;
+
+      resultDiv.textContent = "✏️ Application des modifications…";
+
+      const res = await fetch("/ask",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ data:"", question:editPrompt }) });
+      const reader = res.body.getReader(); const decoder = new TextDecoder(); let modified = "";
+      while (true) { const {done, value} = await reader.read(); if (done) break; modified += decoder.decode(value,{stream:true}); resultDiv.textContent = modified; }
+
+      modified = formatStoryText(modified);
+      lastStory = modified;
+
+      const existing = storyHistory.find(ep => ep.episode === parseInt(episode, 10));
+      if (existing) {
+        existing.fullText = modified;
+        existing.preview = modified.slice(0,100)+"...";
+        existing.content = `<h2>${title}</h2><h3>Épisode ${episode}</h3><div>${modified}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
+        resultDiv.innerHTML = existing.content;
+      }
+      renderHistory(); saveData();
+      document.getElementById("consignes").value = "";
+    }
+
+    // ---------- Épisode suivant ----------
+    async function nextEpisode() {
+      const epInput = document.getElementById("episode");
+      epInput.value = parseInt(epInput.value||"0")+1;
+      await generateStory();
+    }
+
+    // ---------- Style ----------
+    async function styleStory() {
+      if (!lastStory) { alert("Générez d’abord une histoire !"); return; }
+      const stylePrompt = `Réécris ce texte avec style (gras, italique, emojis), sans changer le sens ni rajouter titre ou numéro :\n${lastStory}`;
+      resultDiv.textContent = "✨ Application du style…";
+      const res = await fetch("/ask",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ data:"", question:stylePrompt }) });
+      const reader = res.body.getReader(); const decoder = new TextDecoder(); let styled = "";
+      while (true) { const {done, value} = await reader.read(); if (done) break; styled += decoder.decode(value,{stream:true}); resultDiv.textContent = styled; }
+      styled = formatStoryText(styled);
+      lastStory = styled;
+      const episode = document.getElementById("episode").value.trim(); const title = document.getElementById("title").value.trim(); const author = document.getElementById("author").value.trim();
+      const existing = storyHistory.find(ep => ep.episode === parseInt(episode, 10));
+      if (existing) {
+        existing.fullText = styled;
+        existing.preview = styled.slice(0,100)+"...";
+        existing.content = `<h2>${title}</h2><h3>Épisode ${episode}</h3><div>${styled}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
+        resultDiv.innerHTML = existing.content;
+      }
+      renderHistory(); saveData();
+    }
+
+    // ---------- Réinitialiser ----------
+    function resetStory() {
+      if (!confirm("Voulez-vous vraiment réinitialiser l’histoire ?")) return;
+      localStorage.removeItem("storyData");
+      document.getElementById("title").value=""; document.getElementById("episode").value=""; document.getElementById("author").value=""; document.getElementById("summary").value=""; document.getElementById("consignes").value="";
+      resultDiv.innerHTML=""; historyList.innerHTML=""; storyHistory=[]; lastStory="";
+    }
+
+    // ---------- Export PDF ----------
+    async function exportPDF() {
+      if (storyHistory.length===0) { alert("Aucune histoire à exporter !"); return; }
+      const { jsPDF } = window.jspdf; const doc = new jsPDF(); let y=30;
+      const title=document.getElementById("title").value||"Mon Histoire"; const author=document.getElementById("author").value||"Inconnu"; const summary=document.getElementById("summary").value||"Pas de résumé";
+      doc.setFontSize(24); doc.setTextColor(30,144,255); doc.text(title,105,y,{align:"center"}); y+=20;
+      doc.setFontSize(16); doc.setTextColor(0,0,0); doc.text("Auteur : "+author,105,y,{align:"center"}); y+=20;
+      doc.setFontSize(14); doc.setTextColor(80,80,80); const summaryLines=doc.splitTextToSize("Résumé : "+summary,170); doc.text(summaryLines,20,y); doc.addPage();
+      y=20;
+      storyHistory.forEach((ep)=>{
+        doc.setFontSize(16); doc.setTextColor(255,69,0);
+        doc.text(`Épisode ${ep.episode}`,20,y); y+=10;
+        doc.setFontSize(12); doc.setTextColor(0,0,0);
+        const lines=doc.splitTextToSize(ep.fullText.replace(/<[^>]+>/g,""),170);
+        lines.forEach(line=>{
+          if(y>270){doc.addPage(); y=20;}
+          doc.text(line,20,y,{align:"justify"});
+          y+=7;
+        });
+        y+=10;
+      });
+      doc.setFontSize(10); doc.setTextColor(100,100,100); doc.text("Développeur : Sossou Kouamé",105,290,{align:"center"});
+      doc.save(`${title}.pdf`);
     }
   </script>
 </body>
-</html>
+  </html>
