@@ -32,6 +32,12 @@
     #exportBtn:hover { background: #1e7e34; }
     .btn-modify { background: #ffc107; color: #000; }
     .btn-modify:hover { background: #e0a800; }
+
+    /* 🎨 Styles personnalisés */
+    .dialogue { color: #1e90ff; }       /* Bleu pour dialogues */
+    .proverbe { color: #ff4444; }       /* Rouge pour proverbes */
+    .poeme { color: #ff69b4; font-style: italic; } /* Rose pour poèmes */
+    .bible { color: #ffcc00; font-weight: bold; } /* Jaune gras pour Bible */
   </style>
 </head>
 <body>
@@ -77,6 +83,23 @@
     const historyList = document.getElementById("historyList");
     let lastStory = ""; 
     let storyHistory = []; 
+
+    // 🎨 Fonction de formatage
+    function formatStoryText(text) {
+      let formatted = text
+        // Dialogues commençant par -
+        .replace(/(^|\n)-\s*([^.\n!?]+[.\n!?]*)/g, (m, p1, p2) => `${p1}<span class="dialogue">- ${p2.trim()}</span>`)
+        // Proverbes entre guillemets « … »
+        .replace(/«([^»]+)»/g, '<span class="proverbe">«$1»</span>')
+        // Poèmes entre [poeme]...[/poeme]
+        .replace(/\[poeme\]([\s\S]*?)\[\/poeme\]/g, '<span class="poeme">$1</span>')
+        // Bible entre [bible]...[/bible]
+        .replace(/\[bible\]([\s\S]*?)\[\/bible\]/g, '<span class="bible">$1</span>')
+        // Ajout de retours à la ligne
+        .replace(/([.!?])\s*/g, "$1<br><br>");
+
+      return formatted.trim();
+    }
 
     // ---------- Sauvegarde ----------
     function saveData() {
@@ -131,17 +154,11 @@
 
       let context = `Titre : ${title}\nÉpisode ${episode}\nAuteur : ${author}\n\nRésumé initial : ${summary}\n\n`;
 
-      // Inclure les épisodes précédents pour continuité
+      // Continuité avec dernière phrase
       if (storyHistory.length > 0) {
-        context += `Texte complet des épisodes précédents :\n`;
-        storyHistory.forEach(e => {
-          context += `--- Épisode ${e.episode} ---\n${e.fullText}\n\n`;
-        });
-
-        // Forcer reprise de la dernière phrase
-        const lastEp = storyHistory[storyHistory.length - 1];
-        const lastSentence = lastEp.fullText.trim().split(/[.!?]/).filter(Boolean).pop().trim();
-        context += `⚠️ Le nouvel épisode doit commencer par exactement cette phrase : "${lastSentence}".\n\n`;
+        const lastEp = storyHistory[storyHistory.length - 1].fullText.trim();
+        const lastSentence = lastEp.split(/(?<=[.!?])\s+/).pop();
+        context += `⚠️ Le nouvel épisode doit commencer par cette phrase : "${lastSentence}".\n\n`;
       }
 
       if (consignes) {
@@ -153,11 +170,10 @@
       if (minWords) context += `⚠️ Minimum ${minWords} mots.\n`;
 
       context += `
-⚠️ Ne commence jamais un épisode par : "Le lendemain", "Deux mois plus tard", "De l’autre côté de la ville", etc.
-⚠️ Le contenu doit obligatoirement contenir : dialogues réalistes entre personnages, actions, proverbes, poèmes, ou une leçon tirée de la Bible ou d’un autre livre.
-⚠️ Ne réécris pas le titre ni le numéro d’épisode.
-⚠️ Respecte le titre "${title}".
-⚠️ Style narratif fluide avec émotions, dialogues, emojis, gras et italique.
+⚠️ Ne commence JAMAIS un épisode par "Le lendemain", "Deux mois plus tard", "De l’autre côté de la ville" ou équivalent.
+⚠️ N’ajoute pas de titre ni numéro d’épisode.
+⚠️ Dialogues sous forme de liste avec tiret en début de ligne.
+⚠️ Style narratif fluide avec émotions, dialogues, proverbes, poèmes et références bibliques.
 `;
 
       resultDiv.textContent = "⏳ Kouamé AI réfléchit…";
@@ -178,12 +194,13 @@
         resultDiv.textContent = story;
       }
 
+      // 🎨 Formatage
+      story = formatStoryText(story);
       lastStory = story;
 
       const fullContent = `<h2>${title}</h2><h3>Épisode ${episode}</h3><div>${story}</div><div class="signature">Auteur : ${author}<br>Développeur : Sossou Kouamé</div>`;
       resultDiv.innerHTML = fullContent;
 
-      // ✅ Sauvegarde épisode en entier
       storyHistory.push({ 
         title, 
         episode: parseInt(episode, 10), 
@@ -193,8 +210,6 @@
       });
 
       renderHistory(); saveData();
-
-      // Vider la zone consignes automatiquement
       document.getElementById("consignes").value = "";
     }
 
@@ -214,11 +229,9 @@ ${lastStory}
 
 Consignes de modification : "${consignes}".
 
-⚠️ Applique uniquement ces changements (ajout, suppression ou modification de phrases/événements).
+⚠️ Applique uniquement ces changements.
+⚠️ Ne modifie rien d’autre.
 ⚠️ Ne rajoute pas de titre ni numéro d’épisode.
-⚠️ Ne commence jamais un épisode par : "Le lendemain", "Deux mois plus tard", "De l’autre côté de la ville", etc.
-⚠️ Chaque épisode (sauf le premier) doit commencer par exactement la dernière phrase de l’épisode précédent.
-⚠️ Le texte doit contenir dialogues, actions, proverbes, poèmes ou leçons bibliques/littéraires.
 `;
 
       resultDiv.textContent = "✏️ Application des modifications…";
@@ -226,9 +239,10 @@ Consignes de modification : "${consignes}".
       const res = await fetch("/ask",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ data:"", question:editPrompt }) });
       const reader = res.body.getReader(); const decoder = new TextDecoder(); let modified = "";
       while (true) { const {done, value} = await reader.read(); if (done) break; modified += decoder.decode(value,{stream:true}); resultDiv.textContent = modified; }
+
+      modified = formatStoryText(modified);
       lastStory = modified;
 
-      // ✅ Corrige la recherche avec parseInt
       const existing = storyHistory.find(ep => ep.episode === parseInt(episode, 10));
       if (existing) {
         existing.fullText = modified;
@@ -237,8 +251,6 @@ Consignes de modification : "${consignes}".
         resultDiv.innerHTML = existing.content;
       }
       renderHistory(); saveData();
-
-      // Vider consignes après modification
       document.getElementById("consignes").value = "";
     }
 
@@ -255,10 +267,9 @@ Consignes de modification : "${consignes}".
       const res = await fetch("/ask",{ method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ data:"", question:stylePrompt }) });
       const reader = res.body.getReader(); const decoder = new TextDecoder(); let styled = "";
       while (true) { const {done, value} = await reader.read(); if (done) break; styled += decoder.decode(value,{stream:true}); resultDiv.textContent = styled; }
+      styled = formatStoryText(styled);
       lastStory = styled;
       const episode = document.getElementById("episode").value.trim(); const title = document.getElementById("title").value.trim(); const author = document.getElementById("author").value.trim();
-      
-      // ✅ Corrige la recherche avec parseInt
       const existing = storyHistory.find(ep => ep.episode === parseInt(episode, 10));
       if (existing) { 
         existing.fullText = styled; 
@@ -290,7 +301,7 @@ Consignes de modification : "${consignes}".
         doc.setFontSize(16); doc.setTextColor(255,69,0); 
         doc.text(`Épisode ${ep.episode}`,20,y); y+=10; 
         doc.setFontSize(12); doc.setTextColor(0,0,0); 
-        const lines=doc.splitTextToSize(ep.fullText,170); 
+        const lines=doc.splitTextToSize(ep.fullText.replace(/<[^>]+>/g,""),170); 
         lines.forEach(line=>{ 
           if(y>270){doc.addPage(); y=20;} 
           doc.text(line,20,y,{align:"justify"}); 
